@@ -264,6 +264,10 @@ def read_history_brief(limit: int = 20) -> str:
     return text[-4000:]
 
 
+def _safe_name(name: str) -> str:
+    return re.sub(r'[\\/:*?"<>|]', "_", name).strip()[:40] or "viz"
+
+
 def save_viz(name: str, title: str, html: str) -> None:
     """演绎缓存：生成过的图解存下来，下次秒开。"""
     VIZ_DIR.mkdir(parents=True, exist_ok=True)

@@ -31,7 +31,7 @@ ANSWER_SCHEMA = """{
 
 
 def _chat(system: str, user: str, max_tokens: int = 1500, json_mode: bool = False,
-          timeout: int = 60) -> str:
+          timeout: int = 60, thinking: bool | None = None) -> str:
     kwargs = dict(
         model=MODEL,
         messages=[{"role": "system", "content": system},
@@ -40,6 +40,9 @@ def _chat(system: str, user: str, max_tokens: int = 1500, json_mode: bool = Fals
         max_tokens=max_tokens,
         timeout=timeout,
     )
+    if thinking is False:
+        # 生成类长输出（演绎 HTML）禁用思考：思考会烧光 max_tokens 导致空响应，且耗时 10 倍
+        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
     try:
@@ -256,4 +259,4 @@ def visualize_concept(concept: str, concept_body: str, profile_text: str) -> dic
         f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
     )
     user = f"【概念】{concept}\n【已有讲解】\n{concept_body[:1000]}"
-    return _extract_json(_chat(system, user, max_tokens=3500, timeout=170))
+    return _extract_json(_chat(system, user, max_tokens=6000, timeout=120, thinking=False))
