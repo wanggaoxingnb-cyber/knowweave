@@ -70,9 +70,11 @@ def answer_question(question: str, profile_text: str, related_concepts: list[dic
     return _extract_json(_chat(system, user))
 
 
-def extract_concepts_from_material(title_hint: str, text: str, profile_text: str) -> dict:
-    """资料入库：从长文抽取 1-3 个核心概念并生成讲解。"""
-    schema = """{
+LEARNING_PAGE_SCHEMA = """{
+  "summary": "资料一句话总结，50字内",
+  "walkthrough": [
+    {"heading": "这部分讲了什么（小标题，15字内）", "note": "导读：这部分的重点和怎么看，80字内"}
+  ],
   "concepts": [
     {
       "name": "概念名",
@@ -82,15 +84,54 @@ def extract_concepts_from_material(title_hint: str, text: str, profile_text: str
       "related": ["相关概念名"]
     }
   ],
-  "summary": "资料一句话总结"
+  "quiz": [
+    {"q": "检验是否真懂的问题（不是原文照抄，是理解题）", "a": "参考答案，80字内"}
+  ],
+  "podcast_script": "播客口播稿：把这篇资料的核心讲给用户听，口语化，300字内"
 }"""
+
+
+def build_learning_page(title_hint: str, text: str, profile_text: str) -> dict:
+    """资料入库 → 学习页：总结 + 导读 + 概念卡 + 检验题 + 播客稿。"""
     system = (
-        "你是「织识 KnowWeave」的资料解析器。从用户给的资料里抽取最值得学的 1-3 个核心概念，"
-        "用大白话解释并用用户熟悉领域举例。严格输出 JSON。\n"
-        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
+        "你是「织识 KnowWeave」的学习教练。用户丢给你一份资料，你要帮他真正学会，不是只摘要点。\n"
+        "规则：\n"
+        "1. walkthrough 按资料结构给 2-4 段导读，告诉他每段重点看什么。\n"
+        "2. concepts 抽取最值得学的 1-3 个核心概念，用大白话+用户熟悉领域举例。\n"
+        "3. quiz 出 2-3 道理解检验题（开放式，考察『真懂』而非记忆）。\n"
+        "4. 严格输出 JSON，不要输出其他内容。\n"
+        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{LEARNING_PAGE_SCHEMA}"
     )
     user = f"【资料标题线索】{title_hint}\n\n【资料正文】\n{text[:6000]}"
-    return _extract_json(_chat(system, user, max_tokens=2500))
+    return _extract_json(_chat(system, user, max_tokens=3000))
+
+
+def make_quiz(concept_name: str, concept_body: str, profile_text: str) -> dict:
+    """考考我：针对一个已学概念出理解检验题。"""
+    schema = '{"questions": [{"q": "问题", "a": "参考答案，80字内"}]}'
+    system = (
+        "你是「织识 KnowWeave」的出题官。针对用户学过的一个概念出 3 道开放式理解题，"
+        "由浅到深：第1题考定义，第2题考对比/辨析，第3题考应用（结合用户熟悉领域出题）。"
+        "严格输出 JSON。\n"
+        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
+    )
+    user = f"【概念】{concept_name}\n【当时学的讲解】\n{concept_body[:1200]}"
+    return _extract_json(_chat(system, user, max_tokens=1200))
+
+
+def judge_answer(concept_name: str, question: str, reference: str,
+                 user_answer: str, profile_text: str) -> dict:
+    """判题：判断用户回答是否真懂，给反馈；不懂就换种方式再讲。"""
+    schema = '{"pass": true或false, "feedback": "点评+针对性反馈，100字内，没答对就用用户熟悉领域换个例子再讲一遍"}'
+    system = (
+        "你是「织识 KnowWeave」的判题官。判断用户对概念的回答是否说明他真懂了（不要求用词精确，"
+        "核心意思对就 pass）。反馈要具体：说清他对在哪、缺在哪；没答对就换个用户熟悉领域的例子再讲一次。"
+        "严格输出 JSON。\n"
+        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
+    )
+    user = (f"【概念】{concept_name}\n【题目】{question}\n【参考答案】{reference}\n"
+            f"【用户回答】{user_answer}")
+    return _extract_json(_chat(system, user, max_tokens=800))
 
 
 def available() -> bool:

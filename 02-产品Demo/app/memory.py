@@ -109,6 +109,21 @@ def save_concept(name: str, explanation: str = "", question: str = "", hook: str
     return {"created": created, "mastery_up": mastery_up, "meta": meta}
 
 
+def adjust_mastery(name: str, direction: str) -> str | None:
+    """判题联动：pass 升一级，fail 降一级（不低于 initial）。返回新掌握度。"""
+    path = _concept_path(name)
+    if not path.exists():
+        return None
+    old = load_concept(name)
+    meta, body = old["meta"], old["body"]
+    idx = MASTERY_STAGES.index(meta.get("掌握度", "initial"))
+    idx = idx + 1 if direction == "up" else max(0, idx - 1)
+    meta["掌握度"] = MASTERY_STAGES[idx]
+    meta["更新时间"] = date.today().isoformat()
+    path.write_text(_render_frontmatter(meta) + "\n" + body + "\n", encoding="utf-8")
+    return MASTERY_STAGES[idx]
+
+
 def load_profile() -> str:
     path = PROFILES_DIR / "user.md"
     return path.read_text(encoding="utf-8") if path.exists() else ""

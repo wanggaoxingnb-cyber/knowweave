@@ -29,6 +29,16 @@
   audio { width: 100%; margin-top: 10px; }
   #graph { width: 100%; height: 100%; min-height: 300px; }
   .loading { color: #8a93a8; font-size: 13px; margin-top: 10px; }
+  .quiz-item { background: #131a29; border: 1px solid #2c3650; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .quiz-item .q { font-size: 13px; color: #7ec8ff; margin-bottom: 6px; }
+  .quiz-item input { width: 100%; background: #0f1420; color: #e8eaf0; border: 1px solid #2c3650; border-radius: 6px; padding: 8px; font-size: 13px; }
+  .quiz-item .fb { font-size: 13px; margin-top: 6px; line-height: 1.6; }
+  .quiz-item .fb.pass { color: #7ee2a8; }
+  .quiz-item .fb.fail { color: #f5b942; }
+  .quiz-item button { padding: 5px 12px; font-size: 12px; margin-top: 6px; }
+  .mini-btn { padding: 4px 10px; font-size: 12px; margin-top: 8px; background: #2c3650; }
+  .walk-item { font-size: 13px; line-height: 1.7; margin-top: 8px; }
+  .walk-item b { color: #7ec8ff; }
 </style>
 </head>
 <body>
@@ -76,6 +86,47 @@ async function refreshGraph(highlight = []) {
     { physics: { stabilization: true }, edges: { color: '#3b82f6' } });
 }
 
+let quizSeq = 0;
+
+function esc(t) { return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+function quizBlock(questions, concept) {
+  return questions.map(item => {
+    const id = ++quizSeq;
+    return `<div class="quiz-item" id="quiz-${id}">
+      <div class="q">📝 ${item.q}</div>
+      <input id="qa-${id}" placeholder="用自己的话回答…">
+      <button onclick="judge(${id}, '${concept.replace(/'/g, '')}')">提交</button>
+      <div class="fb" id="qf-${id}"></div>
+      <textarea style="display:none" id="qr-${id}">${esc(item.a)}</textarea>
+      <textarea style="display:none" id="qq-${id}">${item.q}</textarea>
+    </div>`;
+  }).join('');
+}
+
+async function judge(id, concept) {
+  const answer = document.getElementById(`qa-${id}`).value.trim();
+  if (!answer) return;
+  const fb = document.getElementById(`qf-${id}`);
+  fb.className = 'fb'; fb.textContent = '判题中…';
+  const res = await fetch('/api/quiz/judge', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ concept, question: document.getElementById(`qq-${id}`).value,
+      reference: document.getElementById(`qr-${id}`).value, answer }) });
+  const data = await res.json();
+  fb.className = 'fb ' + (data.pass ? 'pass' : 'fail');
+  fb.textContent = (data.pass ? '✅ ' : '💡 ') + (data.feedback || '') + (data.mastery ? `（掌握度 → ${data.mastery}）` : '');
+  refreshGraph();
+}
+
+async function quizMe(concept) {
+  const box = document.getElementById(`quizbox-${concept}`);
+  box.innerHTML = '<div class="loading">出题中…</div>';
+  const res = await fetch('/api/quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ concept }) });
+  const data = await res.json();
+  box.innerHTML = data.error ? `<div class="fb fail">${data.error}</div>` : quizBlock(data.questions || [], concept);
+}
+
 function renderResult(data) {
   const el = document.getElementById('result');
   if (data.error) { el.innerHTML = `<p style="color:#ff8080">${data.error}</p>`; return; }
@@ -83,20 +134,32 @@ function renderResult(data) {
     const c = data.card;
     el.innerHTML = `
       <div class="card">
-        <h3>${c.concept}</h3>
-        <div class="section"><span class="label">大白话：</span>${c.explanation}</div>
-        ${c.analogy ? `<div class="section"><span class="label">举个例子（你熟的）：</span>${c.analogy}</div>` : ''}
-        ${c.hook ? `<div class="section"><span class="label">记忆钩子：</span>${c.hook}</div>` : ''}
-        ${c.warning ? `<div class="warning">⚠️ ${c.warning}</div>` : ''}
-        ${data.learned_before?.length ? `<div class="section">你学过：${data.learned_before.map(x => `<span class="learned">${x}</span>`).join('')}</div>` : ''}
+        <h3>${esc(c.concept)}</h3>
+        <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
+        ${c.analogy ? `<div class="section"><span class="label">举个例子（你熟的）：</span>${esc(c.analogy)}</div>` : ''}
+        ${c.hook ? `<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>` : ''}
+        ${c.warning ? `<div class="warning">⚠️ ${esc(c.warning)}</div>` : ''}
+        ${data.learned_before?.length ? `<div class="section">你学过：${data.learned_before.map(x => `<span class="learned">${esc(x)}</span>`).join('')}</div>` : ''}
         ${data.audio_url ? `<audio controls src="${data.audio_url}"></audio>` : ''}
+        <button class="mini-btn" onclick="quizMe('${(c.concept || '').replace(/'/g, '')}')">🎯 考考我</button>
+        <div id="quizbox-${esc(c.concept)}"></div>
         <div class="events">${data.memory_events.join('；')}${data.mock ? '（mock 模式）' : ''}</div>
       </div>`;
-  } else if (data.cards) {
-    el.innerHTML = `<div class="card"><h3>📥 已入库</h3>
-      <div class="section">${data.summary || ''}</div>
-      ${data.cards.map(c => `<div class="section"><span class="label">${c.name}：</span>${c.explanation || ''}</div>`).join('')}
-      <div class="events">${data.memory_events.join('；')}${data.mock ? '（mock 模式）' : ''}</div></div>`;
+  } else if (data.cards !== undefined) {
+    el.innerHTML = `<div class="card"><h3>📖 学习页</h3>
+      ${data.summary ? `<div class="section"><span class="label">一句话：</span>${esc(data.summary)}</div>` : ''}
+      ${(data.walkthrough || []).map(w => `<div class="walk-item">▸ <b>${esc(w.heading)}</b><br>${esc(w.note)}</div>`).join('')}
+      ${data.audio_url ? `<audio controls src="${data.audio_url}"></audio>` : ''}
+      </div>
+      ${data.cards.map(c => `<div class="card"><h3>${esc(c.name)}</h3>
+        <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
+        ${c.analogy ? `<div class="section"><span class="label">举个例子：</span>${esc(c.analogy)}</div>` : ''}
+        ${c.hook ? `<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>` : ''}
+        <button class="mini-btn" onclick="quizMe('${(c.name || '').replace(/'/g, '')}')">🎯 考考我</button>
+        <div id="quizbox-${esc(c.name)}"></div>
+      </div>`).join('')}
+      ${(data.quiz || []).length ? `<div class="card"><h3>✍️ 检验一下</h3>${quizBlock(data.quiz, data.cards[0]?.name || '')}</div>` : ''}
+      <div class="events" style="padding:0 4px">${(data.memory_events || []).join('；')}${data.mock ? '（mock 模式）' : ''}</div>`;
   }
 }
 
