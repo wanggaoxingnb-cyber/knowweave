@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>织识 KnowWeave — 记得你学过什么的 AI 学习助手</title>
+<script src="/static/vendor/vis-network.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0f1420; color: #e8eaf0; height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 14px 24px; border-bottom: 1px solid #232b3d; display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 20px; color: #7ec8ff; }
+  header .tagline { font-size: 13px; color: #8a93a8; }
+  main { flex: 1; display: grid; grid-template-columns: 340px 1fr 1fr; gap: 12px; padding: 12px; min-height: 0; }
+  .pane { background: #171e2e; border: 1px solid #232b3d; border-radius: 12px; padding: 16px; overflow-y: auto; }
+  .pane h2 { font-size: 14px; color: #8a93a8; margin-bottom: 12px; font-weight: 600; }
+  textarea { width: 100%; height: 110px; background: #0f1420; color: #e8eaf0; border: 1px solid #2c3650; border-radius: 8px; padding: 10px; font-size: 14px; resize: vertical; }
+  button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; cursor: pointer; margin-top: 10px; }
+  button:hover { background: #2563eb; }
+  button.secondary { background: #2c3650; }
+  input[type=file] { margin-top: 10px; font-size: 12px; color: #8a93a8; }
+  .card { background: #0f1420; border: 1px solid #2c3650; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .card h3 { color: #7ec8ff; font-size: 18px; margin-bottom: 8px; }
+  .card .section { margin-top: 10px; font-size: 14px; line-height: 1.7; }
+  .card .label { color: #f5b942; font-weight: 600; }
+  .card .warning { background: #3a2a1a; border: 1px solid #f5b942; border-radius: 8px; padding: 8px 12px; margin-top: 10px; font-size: 13px; }
+  .learned { display: inline-block; background: #1d3a2a; color: #7ee2a8; border-radius: 6px; padding: 2px 8px; margin: 2px; font-size: 12px; }
+  .events { font-size: 12px; color: #8a93a8; margin-top: 8px; }
+  audio { width: 100%; margin-top: 10px; }
+  #graph { width: 100%; height: 100%; min-height: 300px; }
+  .loading { color: #8a93a8; font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>织识 KnowWeave</h1>
+  <span class="tagline">记得你学过什么、也知道你是谁的 AI 学习助手</span>
+</header>
+<main>
+  <div class="pane">
+    <h2>✏️ 输入</h2>
+    <textarea id="question" placeholder="直接提问，例如：回归测试是什么？"></textarea>
+    <button onclick="ask()">提问</button>
+    <div style="margin: 16px 0 8px; color:#8a93a8; font-size:13px;">—— 或喂资料 ——</div>
+    <textarea id="material" placeholder="粘贴文章 / 推文 / 笔记正文"></textarea>
+    <input type="file" id="file" accept=".md,.txt,.pdf,.png,.jpg,.jpeg,.webp">
+    <button class="secondary" onclick="ingest()">入库学习</button>
+    <div class="loading" id="status"></div>
+  </div>
+  <div class="pane">
+    <h2>📇 概念卡</h2>
+    <div id="result"><p style="color:#8a93a8;font-size:13px;">问点什么，或喂一篇资料。</p></div>
+  </div>
+  <div class="pane">
+    <h2>🕸️ 知识图谱</h2>
+    <div id="graph"></div>
+  </div>
+</main>
+<script>
+let network = null;
+
+async function refreshGraph(highlight = []) {
+  const res = await fetch('/api/graph');
+  const data = await res.json();
+  const nodes = new vis.DataSet(data.nodes.map(n => ({
+    id: n.id, label: n.label,
+    color: highlight.includes(n.id)
+      ? { background: '#f5b942', border: '#ffd97a' }
+      : { background: '#2c3650', border: '#3b82f6' },
+    font: { color: '#e8eaf0' },
+    title: `掌握度: ${n.掌握度} · 更新: ${n.更新时间}`
+  })));
+  const edges = new vis.DataSet(data.edges);
+  network = new vis.Network(document.getElementById('graph'),
+    { nodes, edges },
+    { physics: { stabilization: true }, edges: { color: '#3b82f6' } });
+}
+
+function renderResult(data) {
+  const el = document.getElementById('result');
+  if (data.error) { el.innerHTML = `<p style="color:#ff8080">${data.error}</p>`; return; }
+  if (data.card) {
+    const c = data.card;
+    el.innerHTML = `
+      <div class="card">
+        <h3>${c.concept}</h3>
+        <div class="section"><span class="label">大白话：</span>${c.explanation}</div>
+        ${c.analogy ? `<div class="section"><span class="label">举个例子（你熟的）：</span>${c.analogy}</div>` : ''}
+        ${c.hook ? `<div class="section"><span class="label">记忆钩子：</span>${c.hook}</div>` : ''}
+        ${c.warning ? `<div class="warning">⚠️ ${c.warning}</div>` : ''}
+        ${data.learned_before?.length ? `<div class="section">你学过：${data.learned_before.map(x => `<span class="learned">${x}</span>`).join('')}</div>` : ''}
+        ${data.audio_url ? `<audio controls src="${data.audio_url}"></audio>` : ''}
+        <div class="events">${data.memory_events.join('；')}${data.mock ? '（mock 模式）' : ''}</div>
+      </div>`;
+  } else if (data.cards) {
+    el.innerHTML = `<div class="card"><h3>📥 已入库</h3>
+      <div class="section">${data.summary || ''}</div>
+      ${data.cards.map(c => `<div class="section"><span class="label">${c.name}：</span>${c.explanation || ''}</div>`).join('')}
+      <div class="events">${data.memory_events.join('；')}${data.mock ? '（mock 模式）' : ''}</div></div>`;
+  }
+}
+
+async function ask() {
+  const q = document.getElementById('question').value.trim();
+  if (!q) return;
+  document.getElementById('status').textContent = '思考中，顺便翻你的记忆库…';
+  const res = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) });
+  const data = await res.json();
+  document.getElementById('status').textContent = '';
+  renderResult(data);
+  refreshGraph(data.highlight || []);
+}
+
+async function ingest() {
+  const text = document.getElementById('material').value.trim();
+  const file = document.getElementById('file').files[0];
+  if (!text && !file) return;
+  document.getElementById('status').textContent = '解析资料中…';
+  const form = new FormData();
+  form.append('text', text);
+  if (file) form.append('file', file);
+  const res = await fetch('/api/ingest', { method: 'POST', body: form });
+  const data = await res.json();
+  document.getElementById('status').textContent = '';
+  renderResult(data);
+  refreshGraph(data.highlight || []);
+}
+
+refreshGraph();
+</script>
+</body>
+</html>
