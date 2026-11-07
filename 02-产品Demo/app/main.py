@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -247,6 +247,17 @@ def concepts():
 def get_profile():
     """它眼中的你：返回用户画像原文（含信号沉淀区）。"""
     return {"profile": memory.load_profile()}
+
+
+@app.post("/api/profile")
+async def save_profile(request: Request):
+    """画像面板编辑后写回 memory/profiles/user.md。"""
+    body = await request.json()
+    content = (body.get("profile") or "").strip()
+    if not content:
+        return JSONResponse({"error": "内容为空"}, status_code=400)
+    (memory.PROFILES_DIR / "user.md").write_text(content, encoding="utf-8")
+    return {"ok": True}
 
 
 @app.get("/api/audio/{name}")
