@@ -30,14 +30,25 @@ ANSWER_SCHEMA = """{
 }"""
 
 
-def _chat(system: str, user: str, max_tokens: int = 1500) -> str:
-    resp = _client.chat.completions.create(
+def _chat(system: str, user: str, max_tokens: int = 1500, json_mode: bool = False,
+          timeout: int = 60) -> str:
+    kwargs = dict(
         model=MODEL,
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": user}],
         temperature=0.4,
         max_tokens=max_tokens,
+        timeout=timeout,
     )
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+    try:
+        resp = _client.chat.completions.create(**kwargs)
+    except Exception:
+        if not json_mode:
+            raise
+        kwargs.pop("response_format", None)
+        resp = _client.chat.completions.create(**kwargs)
     return resp.choices[0].message.content.strip()
 
 
@@ -155,7 +166,8 @@ def route_intent(text: str, has_files: bool, has_url: bool) -> dict:
         '"reason": "判断理由，15字内"}'
     )
     system = (
-        "你是意图路由器。判断用户这句话的意图：\n"
+        "你是意图路由器。做两件事：①判断用户这句话的意图；②从话里挖用户本人的新信息。\n"
+        "意图只能是以下之一：\n"
         "- explain: 问某个概念/知识点是什么\n"
         "- learn: 给了资料/文章/链接，想学习它（含'帮我学''总结下这篇'）\n"
         "- save: 想先存着以后看（'先存着''回头再看''码住'）\n"
@@ -165,15 +177,31 @@ def route_intent(text: str, has_files: bool, has_url: bool) -> dict:
         "- mentor: 想系统学某个领域/主题（'我要系统学''怎么入门'）\n"
         "- create: 想把学过的东西写成文章/输出内容\n"
         "- chat: 闲聊或以上都不是\n"
-        "只输出 JSON。" + ("注意：文本里有链接，若语气是先存着则 save，想学习则 learn。" if has_url else "")
+        "concepts 提取规则：从文本里挑出提到的知识概念名词（技术名词/方法论名词），"
+        "没有就空数组。concepts 字段必须出现，不能省略。\n"
+        "signals 提取规则：只记用户本人的信息（身份/职业/爱好/熟悉领域/学习目标/偏好），"
+        "每条是一句可沉淀的事实；纯问题没有新信息就给空数组。signals 字段必须出现，不能省略。\n"
+        "示例1：用户说「我在保险公司做运营，用卖保险给我讲讲灰度测试」→ "
+        "intent=explain, concepts=[\"灰度测试\"], signals=[\"在保险公司做运营\", \"偏好保险业务例子\"]\n"
+        "示例2：用户说「什么是Transformer」→ intent=explain, concepts=[\"Transformer\"], signals=[]\n"
+        "示例3：用户说「考考我Attention」→ intent=quiz, concepts=[\"Attention\"], signals=[]\n"
+        "只输出 JSON，intent/topic/concepts/signals/reason 五个字段一个都不能少，不要输出其他字段。" + ("注意：文本里有链接，若语气是先存着则 save，想学习则 learn。" if has_url else "")
     )
     try:
-        result = _extract_json(_chat(system, text, max_tokens=400))
+        result = _extract_json(_chat(system, text, max_tokens=400, json_mode=True))
         if result.get("intent") not in INTENTS:
             result["intent"] = "explain"
-        return result
     except Exception:
-        return {"intent": "save" if has_url else "explain", "signals": [], "concepts": []}
+        result = {"intent": "save" if has_url else "explain"}
+    result.setdefault("topic", "")
+    result.setdefault("concepts", [])
+    result.setdefault("signals", [])
+    result.setdefault("reason", "")
+    if not isinstance(result["signals"], list):
+        result["signals"] = [str(result["signals"])]
+    if not isinstance(result["concepts"], list):
+        result["concepts"] = [str(result["concepts"])]
+    return result
 
 
 def weave_explain(concepts: list[str], profile_text: str, concept_bodies: dict) -> dict:
@@ -221,10 +249,11 @@ def visualize_concept(concept: str, concept_body: str, profile_text: str) -> dic
     schema = '{"title": "标题", "html": "完整自包含 HTML（内联CSS/JS，无外部依赖，深色背景#0f1420，中文）"}'
     system = (
         "你是「织识」的演绎引擎。把一个难概念做成自包含 HTML 图解或交互动画"
-        "（SVG 示意图/步骤动画/可拖动的小交互均可），帮用户直觉理解。"
+        "（SVG 示意图/步骤动画/可点击的步骤切换均可），帮用户直觉理解。"
         "要求：单个完整 HTML 文档、无外部依赖、深色主题、中文标注、能在 iframe 里直接跑。"
+        "重要：克制！HTML 控制在 120 行以内，只做最核心的一个画面/一个交互，宁小勿大。"
         "严格输出 JSON，html 字段是完整 HTML 字符串。\n"
         f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
     )
     user = f"【概念】{concept}\n【已有讲解】\n{concept_body[:1000]}"
-    return _extract_json(_chat(system, user, max_tokens=6000))
+    return _extract_json(_chat(system, user, max_tokens=3500, timeout=170))

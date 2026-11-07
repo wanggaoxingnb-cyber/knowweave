@@ -440,9 +440,15 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
         names = route.get("concepts", []) or memory.match_concepts_in_text(text)
         target = names[0] if names else text[:10]
         concept = memory.load_concept(target)
+        cached = memory.load_viz(target)
+        if cached:
+            return {"type": "visualize", "reply": f"「{target}」的图解之前做过，秒开 🎬",
+                    "viz": cached, "highlight": [target]}
         if brain.available():
             result = brain.visualize_concept(target, concept["body"] if concept else "", profile)
-            return {"type": "visualize", "reply": f"给「{target}」做了个图解，中间看 🎬",
+            if result.get("html"):
+                memory.save_viz(target, result.get("title", target), result["html"])
+            return {"type": "visualize", "reply": f"给「{target}」现做了一个图解，中间看 🎬",
                     "viz": result, "highlight": [target]}
         return {"type": "chat", "reply": "mock 模式不支持演绎"}
 

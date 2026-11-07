@@ -10,6 +10,7 @@ MEMORY_DIR = ROOT / "memory"
 CONCEPTS_DIR = MEMORY_DIR / "concepts"
 PROFILES_DIR = MEMORY_DIR / "profiles"
 HISTORY_DIR = ROOT / "data" / "history"
+VIZ_DIR = ROOT / "data" / "viz"
 
 MASTERY_STAGES = ["initial", "理解了", "能讲给别人", "能用"]
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
@@ -261,6 +262,24 @@ def read_history_brief(limit: int = 20) -> str:
     files = sorted(HISTORY_DIR.glob("qa-*.md"))[-3:]
     text = "\n".join(f.read_text(encoding="utf-8") for f in files)
     return text[-4000:]
+
+
+def save_viz(name: str, title: str, html: str) -> None:
+    """演绎缓存：生成过的图解存下来，下次秒开。"""
+    VIZ_DIR.mkdir(parents=True, exist_ok=True)
+    (VIZ_DIR / f"{_safe_name(name)}.json").write_text(
+        __import__("json").dumps({"concept": name, "title": title, "html": html},
+                                 ensure_ascii=False), encoding="utf-8")
+
+
+def load_viz(name: str) -> dict | None:
+    path = VIZ_DIR / f"{_safe_name(name)}.json"
+    if not path.exists():
+        return None
+    try:
+        return __import__("json").loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 def match_concepts_in_text(text: str) -> list[str]:
