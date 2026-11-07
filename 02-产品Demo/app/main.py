@@ -243,6 +243,12 @@ def concepts():
     return {"concepts": [{k: v for k, v in c.items() if k != "body"} for c in memory.list_concepts()]}
 
 
+@app.get("/api/profile")
+def get_profile():
+    """它眼中的你：返回用户画像原文（含信号沉淀区）。"""
+    return {"profile": memory.load_profile()}
+
+
 @app.get("/api/audio/{name}")
 def audio(name: str):
     path = AUDIO_DIR / Path(name).name
@@ -361,7 +367,9 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
                     "用一句话说出这篇资料最值得读的点（30字内），JSON: {\"hook\": \"...\"}", raw[:1500], 200))["hook"]
             except Exception:
                 hook = raw[:50]
-        title = text.replace(url_match.group(0), "").strip(" ，,。：:")[:30] or url_match.group(0)[:40]
+        title = text.replace(url_match.group(0), "").strip(" ，,。：:")
+        if title in ("", "先存着", "存着", "存一下", "收藏", "回头再看", "稍后读", "马住", "mark"):
+            title = hook[:20] or url_match.group(0)[:40]
         memory.add_to_inbox(title, url_match.group(0), hook)
         return {"type": "save", "reply": f"已存入待学习区 📥 种草点：{hook}{signal_note}",
                 "inbox": memory.list_inbox()}

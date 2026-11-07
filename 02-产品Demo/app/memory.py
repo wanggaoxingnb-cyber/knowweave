@@ -244,11 +244,14 @@ def append_profile_signals(signals: list[str]) -> list[str]:
     text = path.read_text(encoding="utf-8") if path.exists() else ""
     if "## 信号沉淀" not in text:
         text += "\n\n## 信号沉淀（AI 从对话中提取，可改可删）\n"
+    norm_existing = re.sub(r"[\s，。、,.·\-—/（）()：:；;]", "", text)
     written = []
     for sig in signals[:2]:
         sig = sig.strip().strip("。-")
-        if sig and sig not in text and len(sig) > 4:
+        norm = re.sub(r"[\s，。、,.·\-—/（）()：:；;]", "", sig)
+        if sig and len(sig) > 4 and norm not in norm_existing:
             text += f"\n- [{date.today().isoformat()}] {sig}"
+            norm_existing += norm
             written.append(sig)
     if written:
         path.write_text(text + "\n", encoding="utf-8")
