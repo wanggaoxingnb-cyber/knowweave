@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>方向B：对话中心（沉浸式，推荐）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"PingFang SC",sans-serif; }
+  body { background:#f5f5f5; color:#333; height:100vh; display:flex; flex-direction:column; }
+  header { background:#fff; border-bottom:2px solid #999; padding:10px 16px; display:flex; align-items:center; gap:10px; }
+  .logo { font-weight:700; border:2px solid #333; padding:2px 10px; }
+  .capsule { border:2px dashed #666; border-radius:16px; padding:4px 12px; font-size:12px; cursor:pointer; background:#fff; }
+  .capsule:hover { background:#eee; }
+  main { flex:1; display:flex; justify-content:center; min-height:0; }
+  .chat { width:720px; max-width:90%; background:#fff; border:2px solid #999; margin:10px 0 0; padding:14px; position:relative; overflow:hidden; }
+  .msg { border:1.5px solid #888; border-radius:10px; padding:8px; margin:6px 0; font-size:12px; max-width:85%; }
+  .msg.user { margin-left:auto; background:#e8e8e8; }
+  .card { border:2px solid #333; border-radius:10px; padding:12px; margin:8px 0; font-size:12px; background:#fafafa; }
+  .inputbar { position:absolute; bottom:0; left:0; right:0; border-top:2px solid #999; padding:10px; background:#fff; display:flex; gap:6px; }
+  .inputbar .box { flex:1; border:2px dashed #888; border-radius:8px; padding:8px; font-size:12px; color:#999; }
+  .inputbar .btn { border:2px solid #333; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:700; }
+  .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:20; }
+  .overlay .inner { position:absolute; inset:5% 8%; background:#fff; border:3px solid #333; border-radius:14px; padding:20px; }
+  .node { display:inline-block; border:2px solid #666; border-radius:50%; width:52px; height:52px; line-height:50px; text-align:center; font-size:10px; margin:8px; background:#fff; }
+  .tag { position:absolute; font-size:11px; color:#fff; background:#333; padding:2px 8px; border-radius:8px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">织识</span>
+  <span style="flex:1"></span>
+  <span class="capsule" onclick="document.getElementById('graphov').style.display='block'">🕸️ 知识图谱 ←点我全屏</span>
+  <span class="capsule" onclick="document.getElementById('inboxov').style.display='block'">📥 待学习 (2)</span>
+  <span class="capsule" onclick="document.getElementById('pop').style.display='block'">👤</span>
+</header>
+<main>
+  <div class="chat">
+    <div class="tag" style="top:8px;right:8px">默认界面只有一个对话，零干扰</div>
+    <div class="msg">回归测试是啥</div>
+    <div class="msg user">改完代码重跑老功能，防止弄坏。</div>
+    <div class="card">🃏 概念卡：回归测试（产出直接插在对话流里，限高可滚动，点标题折叠）<br>大白话 / 举例 / 记忆钩子 / 🎧播客 / [考考我]</div>
+    <div class="msg">考考我</div>
+    <div class="card">🎯 检验题 ×3（答题框内联在卡片里，判题反馈即时出现）</div>
+    <div class="inputbar"><div class="box">问点什么 / 贴链接 / 拖文件 / 拖截图</div><div class="btn">发送</div></div>
+  </div>
+</main>
+
+<div class="overlay" id="graphov">
+  <div class="inner">
+    <b>🕸️ 知识图谱（全屏覆盖层——演示"哇点"）</b>
+    <div style="text-align:center;padding:40px 0">
+      <span class="node">RAG</span><span class="node">向量检索</span><span class="node">Attention</span><span class="node">回归测试</span><span class="node">冒烟测试</span>
+    </div>
+    <div class="card">大图随便看：缩放/拖拽/点节点看详情。Esc 或右上角关闭回到对话。</div>
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:16px;right:16px;padding:6px 14px">✕ 关闭</button>
+  </div>
+</div>
+<div class="overlay" id="inboxov">
+  <div class="inner" style="inset:0 0 0 auto;width:400px;border-radius:0">
+    <b>📥 待学习区（右侧滑入）</b>
+    <div class="card" style="margin-top:12px">RAG调优文章<br>种草点：混合检索解决召回不准<br>[📖 开始学] [🎧 听个大概]</div>
+    <div class="card">截图 11-07 [📖] [🎧]</div>
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute;top:16px;right:16px;padding:6px 14px">✕</button>
+  </div>
+</div>
+<div class="overlay" id="pop" style="background:none;pointer-events:none">
+  <div style="pointer-events:auto;position:absolute;top:60px;right:16px;width:320px;background:#fff;border:3px solid #333;border-radius:12px;padding:16px">
+    <b>👤 它眼中的你</b>
+    <div class="card" style="margin-top:8px">画像 + AI 总结 + [✏️ 修改]</div>
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="margin-top:8px;padding:6px 14px">关闭</button>
+  </div>
+</div>
+</body>
+</html>

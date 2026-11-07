@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>问题1：并排 vs 覆盖层</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"PingFang SC",sans-serif; }
+  body { background:#f5f5f5; padding:20px; }
+  h1 { font-size:18px; margin-bottom:14px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .col h2 { font-size:15px; margin-bottom:8px; }
+  .screen { background:#fff; border:2.5px solid #333; border-radius:10px; height:380px; position:relative; overflow:hidden; display:flex; }
+  .chatpane { border-right:2px dashed #999; padding:10px; }
+  .msg { border:1.5px solid #888; border-radius:8px; padding:6px; margin:5px 0; font-size:11px; }
+  .msg.user { background:#e8e8e8; margin-left:20px; }
+  .stage { background:#fafafa; padding:10px; }
+  .artifact { border:2px solid #333; border-radius:8px; padding:10px; font-size:11px; background:#fff; margin:6px 0; }
+  .overlaybox { position:absolute; inset:8% 12%; background:#fff; border:3px solid #333; border-radius:12px; padding:14px; box-shadow:0 8px 30px rgba(0,0,0,.25); font-size:11px; z-index:5; }
+  .dim { position:absolute; inset:0; background:rgba(0,0,0,.18); z-index:4; }
+  .proscons { margin-top:10px; font-size:13px; line-height:1.9; }
+  .good { color:#1a7a3a; } .bad { color:#b03030; }
+  .hand { position:absolute; font-size:20px; z-index:6; }
+  .cap { font-size:11px; color:#666; margin-top:6px; }
+</style>
+</head>
+<body>
+<h1>问题 1：图解/学习页这种"大产出"往哪放？（对话都是左边的 💬）</h1>
+<div class="row">
+  <div class="col">
+    <h2>✅ 方案一：并排（推荐）——对话收窄，舞台在右</h2>
+    <div class="screen">
+      <div class="chatpane" style="width:46%">
+        <div class="msg">Attention 画给我看</div>
+        <div class="msg user">做好了，在右边 👉</div>
+        <div class="msg" style="border-color:#1a7a3a">这个"权重"啥意思？<br>← 看着图解直接追问</div>
+        <div class="msg user">权重=每个词被关注的程度…</div>
+      </div>
+      <div class="stage" style="flex:1">
+        <div class="artifact">🎬 图解：Attention<br>（交互式动画，完整展示）</div>
+        <div class="artifact">📖 学习页 / 文章 / 路径<br>都在这个舞台，可切换</div>
+      </div>
+      <div class="hand" style="left:26%;top:34%">👆</div>
+    </div>
+    <div class="cap">对话和图解同时在屏，左边问、右边看</div>
+    <div class="proscons">
+      <div class="good">✔ 边学边问：看着产出直接追问，不用切来切去</div>
+      <div class="good">✔ "AI 助教坐你旁边"的感觉，产品差异化就在这</div>
+      <div class="bad">✘ 两边都变窄，图解没有全屏爽</div>
+    </div>
+  </div>
+  <div class="col">
+    <h2>方案二：覆盖层——产出浮起来盖住对话</h2>
+    <div class="screen" style="display:block">
+      <div style="padding:10px">
+        <div class="msg">Attention 画给我看</div>
+        <div class="msg user">做好了 👉</div>
+        <div class="msg">这个权重啥意思？</div>
+      </div>
+      <div class="dim"></div>
+      <div class="overlaybox">
+        <b>🎬 图解：Attention（大而清晰）</b>
+        <div class="artifact">交互式动画全尺寸展示，看得爽</div>
+        <div style="color:#b03030;margin-top:8px">想问问题？得先点 ✕ 关掉我…<br>关掉后图解又看不见了</div>
+      </div>
+      <div class="hand" style="left:70%;top:20%">👆</div>
+    </div>
+    <div class="cap">图解盖在对话上，同一时间只能干一件事</div>
+    <div class="proscons">
+      <div class="good">✔ 产出全尺寸，第一眼看爽</div>
+      <div class="good">✔ 实现最简单</div>
+      <div class="bad">✘ 盖住对话：看图解时不能问，问的时候看不见图解</div>
+      <div class="bad">✘ "边学边问"这个灵魂场景直接没了</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
