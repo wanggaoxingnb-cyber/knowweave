@@ -130,7 +130,7 @@ def make_quiz(concept_name: str, concept_body: str, profile_text: str) -> dict:
         f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
     )
     user = f"【概念】{concept_name}\n【当时学的讲解】\n{concept_body[:1200]}"
-    return _extract_json(_chat(system, user, max_tokens=1200))
+    return _extract_json(_chat(system, user, max_tokens=2500, thinking=False))
 
 
 def judge_answer(concept_name: str, question: str, reference: str,
