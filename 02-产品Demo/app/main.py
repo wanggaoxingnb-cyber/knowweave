@@ -502,6 +502,29 @@ async def inbox_learn(payload: dict):
             "pages": [page], "highlight": page["highlight"], "inbox": memory.list_inbox()}
 
 
+@app.post("/api/inbox/podcast")
+async def inbox_podcast(payload: dict):
+    """听个大概：只出 60 秒播客摘要，不建档不消耗整块时间（S2 碎片消化）。"""
+    file_stem = payload.get("file", "")
+    items = {i.get("_file"): i for i in memory.list_inbox()}
+    item = items.get(file_stem)
+    if not item:
+        return JSONResponse({"error": "条目不存在"}, status_code=404)
+    url = str(item.get("链接", ""))
+    raw = _fetch_url_text(url) if url.startswith("http") else ""
+    src = raw[:2500] if len(raw) > 300 else f"标题：{item.get('标题')}\n种草点：{item.get('种草点')}"
+    script = ""
+    if brain.available():
+        script = brain._chat(
+            "你是织识的播客主播。把资料浓缩成 60 秒口播摘要（150-180字）：先一句话说这是什么，"
+            "再讲最值得知道的 2 个点，最后一句说值不值得找整块时间深读。像朋友转述，口语化。"
+            "直接出口播稿，不要任何格式和标题。",
+            src, 300, thinking=False)
+    audio_url = await _tts(script)
+    return {"type": "podcast", "reply": f"「{item.get('标题')}」的 60 秒版放中间了 🎧",
+            "title": item.get("标题"), "script": script, "audio_url": audio_url}
+
+
 @app.get("/api/concept/{name}")
 def concept_detail_v2(name: str):
     concept = memory.load_concept(name)

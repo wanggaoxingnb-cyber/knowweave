@@ -65,6 +65,8 @@
   /* 右：图谱区 */
   #graphPane { border-left:1px solid #232b3d; display:flex; flex-direction:column; }
   #graphPane h2 { font-size:13px; color:#8a93a8; padding:12px 14px 0; font-weight:600; }
+  #graphLegend { display:flex; flex-wrap:wrap; gap:10px; padding:6px 14px 4px; font-size:11px; color:#8a93a8; }
+  #graphLegend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; }
   #graph { flex:1; min-height:0; }
   #profileBox { border-top:1px solid #232b3d; display:flex; flex-direction:column; max-height:45%; }
   #profileBox h2 { font-size:13px; color:#8a93a8; padding:10px 14px 6px; font-weight:600; cursor:pointer; user-select:none; }
@@ -98,6 +100,7 @@
         <span class="chip" onclick="fillAndSend('我要系统学 LLM 原理')">我要系统学 LLM 原理</span>
         <span class="chip" onclick="fillAndSend('RAG 跟向量检索什么关系')">RAG 和向量检索啥关系</span>
         <span class="chip" onclick="fillAndSend('把最近学的写成一篇文章')">最近学的写成文章</span>
+        <span class="chip" onclick="fillAndSend('先存着 https://www.cnblogs.com/995i996/p/23552174')">存篇 RAG 文章</span>
       </div>
       <div class="msg sys">💡 贴个链接说「先存着」会进待学习区（右上角）</div>
     </div>
@@ -114,6 +117,13 @@
   <div id="outPane"><h2>📇 产出区</h2><div id="out"><p style="color:#8a93a8;font-size:13px;">概念卡 / 学习页 / 图解 / 文章会出现在这里。</p></div></div>
   <div id="graphPane">
     <h2>🕸️ 知识图谱（点节点看详情）</h2>
+    <div id="graphLegend">
+      <span><i style="background:#2c3650"></i>新接触</span>
+      <span><i style="background:#2a4a6a"></i>理解了</span>
+      <span><i style="background:#1d6a4a"></i>能讲给别人</span>
+      <span><i style="background:#7ee2a8"></i>能用</span>
+      <span><i style="background:#f5b942"></i>本次相关</span>
+    </div>
     <div id="graph"></div>
     <div id="profileBox">
       <h2 onclick="document.getElementById('profileBody').classList.toggle('collapsed')">👤 它眼中的你（越用越懂你）▾</h2>
@@ -257,8 +267,22 @@ async function showInbox() {
   $('out').innerHTML = `<div class="card"><h3>📥 待学习区（${d.items.length}）</h3></div>` +
     (d.items.length ? d.items.map(i=>`<div class="inbox-item"><b>${esc(i['标题'])}</b>
       <div class="hook">种草点：${esc(i['种草点'])}　·　存于 ${esc(i['存入时间'])}</div>
-      <button class="mini-btn" onclick="learnInbox('${esc(i._file)}')">📖 开始学</button></div>`).join('')
+      <button class="mini-btn" onclick="learnInbox('${esc(i._file)}')">📖 开始学</button>
+      <button class="mini-btn" onclick="podcastInbox('${esc(i._file)}')">🎧 听个大概</button></div>`).join('')
     : '<div class="card">缓存区是空的。丢个链接说"先存着"试试。</div>');
+}
+async function podcastInbox(file) {
+  showStatus('做 60 秒播客中…');
+  const d = await (await fetch('/api/inbox/podcast',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({file})})).json();
+  showStatus('');
+  if (d.script) {
+    $('out').innerHTML = `<div class="card"><h3>🎧 听个大概：${esc(d.title)}</h3>
+      ${d.audio_url?`<audio controls autoplay src="${d.audio_url}"></audio>`:''}
+      <div class="section" style="white-space:pre-wrap">${esc(d.script)}</div>
+      <div class="events">听完想深学就回待学习区点「开始学」</div></div>`;
+  }
+  addMsg('bot', d.reply || d.error || '出了点问题');
 }
 async function learnInbox(file) {
   showStatus('学习中…');
@@ -291,8 +315,10 @@ async function send() {
   pendingFiles.forEach(f => form.append('files', f));
   pendingFiles = []; $('fileChips').innerHTML = '';
   showStatus('织识思考中…');
+  const slowHint = setTimeout(() => showStatus('还在生成，图解/文章类要约 15-30 秒…'), 6000);
   try {
     const d = await (await fetch('/api/chat', {method:'POST', body:form})).json();
+    clearTimeout(slowHint);
     showStatus('');
     if (d.error) { addMsg('bot', d.error); return; }
     addMsg('bot', d.reply || '好了。');
@@ -305,7 +331,7 @@ async function send() {
     else if (d.type==='save') { updateInboxCount(d.inbox); }
     if (d.highlight) refreshGraph(d.highlight);
     loadProfile();
-  } catch (e) { showStatus(''); addMsg('bot', '出错了：' + e.message); }
+  } catch (e) { clearTimeout(slowHint); showStatus(''); addMsg('bot', '出错了：' + e.message); }
 }
 
 loadProfile();

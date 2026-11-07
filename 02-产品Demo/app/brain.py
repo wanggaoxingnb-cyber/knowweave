@@ -31,7 +31,7 @@ ANSWER_SCHEMA = """{
 
 
 def _chat(system: str, user: str, max_tokens: int = 1500, json_mode: bool = False,
-          timeout: int = 60, thinking: bool | None = None) -> str:
+          timeout: int = 60, thinking: bool | None = False) -> str:
     kwargs = dict(
         model=MODEL,
         messages=[{"role": "system", "content": system},
@@ -58,8 +58,23 @@ def _chat(system: str, user: str, max_tokens: int = 1500, json_mode: bool = Fals
 def _extract_json(text: str) -> dict:
     match = re.search(r"\{.*\}", text, re.S)
     if not match:
-        raise ValueError(f"no json in: {text[:200]}")
-    return json.loads(match.group(0))
+        # 输出被截断（没有收尾的 }）：尝试补齐括号抢救
+        start = text.find("{")
+        if start == -1:
+            raise ValueError(f"no json in: {text[:200]}")
+        frag = text[start:]
+        for _ in range(8):
+            frag = frag.rstrip().rstrip(",").rstrip('"')
+            frag += '"}' if frag.count('"') % 2 == 0 else "}"
+            try:
+                return json.loads(frag)
+            except Exception:
+                frag += "}"
+        raise ValueError(f"truncated json: {text[:200]}")
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return _extract_json(match.group(0)[: match.group(0).rfind("}")])
 
 
 def answer_question(question: str, profile_text: str, related_concepts: list[dict]) -> dict:
@@ -229,7 +244,7 @@ def mentor_path(topic: str, profile_text: str, graph_brief: str) -> dict:
         "严格输出 JSON。\n"
         f"【用户画像】\n{profile_text}\n【用户已学概念及掌握度】\n{graph_brief}\n输出 JSON schema：\n{schema}"
     )
-    return _extract_json(_chat(system, f"我想系统学：{topic}", max_tokens=1200))
+    return _extract_json(_chat(system, f"我想系统学：{topic}", max_tokens=2500))
 
 
 def create_article(instruction: str, profile_text: str, concepts_brief: str, history_brief: str) -> dict:
