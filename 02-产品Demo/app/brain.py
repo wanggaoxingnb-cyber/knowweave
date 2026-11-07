@@ -22,7 +22,7 @@ if API_KEY:
 ANSWER_SCHEMA = """{
   "concept": "本次讲解的主概念名（简短名词）",
   "explanation": "大白话解释，150字内，产品经理能看懂",
-  "analogy": "用用户熟悉领域（优先英雄联盟/游戏，其次直销/门店）举一个具体例子，100字内",
+  "analogy": "用用户熟悉领域（优先英雄联盟/三角洲等游戏，其次直销）举一个具体例子，100字内",
   "hook": "一句话记忆钩子，30字内",
   "warning": "如果用户问的概念和已学概念容易混淆，给出防混提示，格式「别和XX混：...」，没有就留空字符串",
   "podcast_script": "播客口播稿，口语化，200字内，把解释+例子讲一遍",
@@ -196,13 +196,16 @@ def route_intent(text: str, has_files: bool, has_url: bool) -> dict:
         "- create: 想把学过的东西写成文章/输出内容\n"
         "- chat: 闲聊或以上都不是\n"
         "concepts 提取规则：从文本里挑出提到的知识概念名词（技术名词/方法论名词），"
-        "没有就空数组。concepts 字段必须出现，不能省略。\n"
+        "没有就空数组。concepts 字段必须出现，不能省略。"
+        "用户说话可能啰嗦口语化，只提取真正的知识概念，忽略语气词和闲聊。"
+        "用户当前最想了解的主概念必须放第一个；被「除了X」「不是X」排除的概念不要放。\n"
         "signals 提取规则：只记用户本人的信息（身份/职业/爱好/熟悉领域/学习目标/偏好），"
         "每条是一句可沉淀的事实；纯问题没有新信息就给空数组。signals 字段必须出现，不能省略。\n"
         "示例1：用户说「我在保险公司做运营，用卖保险给我讲讲灰度测试」→ "
         "intent=explain, concepts=[\"灰度测试\"], signals=[\"在保险公司做运营\", \"偏好保险业务例子\"]\n"
         "示例2：用户说「什么是Transformer」→ intent=explain, concepts=[\"Transformer\"], signals=[]\n"
         "示例3：用户说「考考我Attention」→ intent=quiz, concepts=[\"Attention\"], signals=[]\n"
+        "示例4：用户说「用图片/图形的形式帮我理解X」「X 画给我看」→ intent=visualize, concepts=[\"X\"]\n"
         "只输出 JSON，intent/topic/concepts/signals/reason 五个字段一个都不能少，不要输出其他字段。" + ("注意：文本里有链接，若语气是先存着则 save，想学习则 learn。" if has_url else "")
     )
     try:

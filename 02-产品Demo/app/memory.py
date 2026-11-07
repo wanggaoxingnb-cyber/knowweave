@@ -193,6 +193,32 @@ def add_to_inbox(title: str, url: str, hook: str) -> str:
     return safe
 
 
+def add_image_to_inbox(filename: str, data: bytes, ocr_text: str) -> str:
+    """截图进收件箱：图片存 data/inbox_files/，OCR 文本存进条目正文。"""
+    INBOX_DIR.mkdir(parents=True, exist_ok=True)
+    att_dir = ROOT / "data" / "inbox_files"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    today = date.today().isoformat()
+    import hashlib as _h
+    ext = Path(filename).suffix.lower() or ".png"
+    att_name = _h.md5(data).hexdigest()[:12] + ext
+    (att_dir / att_name).write_bytes(data)
+    title = f"截图 {today} {filename[:20]}"
+    safe = re.sub(r'[\\/:*?"<>|]', "_", title).strip()[:40] or "截图"
+    hook = (ocr_text.strip().split("\n")[0] if ocr_text.strip() else "（没识别出文字，打开图看看）")[:40]
+    (INBOX_DIR / f"{safe}.md").write_text(
+        f"---\n标题: {title}\n链接: \n种草点: {hook}\n存入时间: {today}\n状态: 待学习\n附件: {att_name}\n---\n\n{ocr_text}\n",
+        encoding="utf-8")
+    return safe
+
+
+def load_inbox_item(file_stem: str) -> tuple[dict, str] | None:
+    path = INBOX_DIR / f"{file_stem}.md"
+    if not path.exists():
+        return None
+    return _parse_frontmatter(path.read_text(encoding="utf-8"))
+
+
 def list_inbox() -> list[dict]:
     result = []
     if not INBOX_DIR.exists():

@@ -13,8 +13,10 @@
   header .tagline { font-size:12px; color:#8a93a8; flex:1; }
   header button { background:#2c3650; color:#e8eaf0; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; }
   header button:hover { background:#3b82f6; }
-  main { flex:1; display:grid; grid-template-columns:400px 1fr 360px; grid-template-rows:minmax(0,1fr); min-height:0; }
+  main { flex:1; display:grid; grid-template-columns:400px 5px 1fr 5px 360px; grid-template-rows:minmax(0,1fr); min-height:0; }
   main > * { min-height:0; }
+  .divider { background:#232b3d; cursor:col-resize; }
+  .divider:hover { background:#3b82f6; }
 
   /* 左：对话区 */
   #chatPane { border-right:1px solid #232b3d; display:flex; flex-direction:column; }
@@ -114,7 +116,9 @@
       <input type="file" id="fileInput" multiple style="display:none" accept=".md,.txt,.pdf,.png,.jpg,.jpeg,.webp">
     </div>
   </div>
-  <div id="outPane"><h2>📇 产出区</h2><div id="out"><p style="color:#8a93a8;font-size:13px;">概念卡 / 学习页 / 图解 / 文章会出现在这里。</p></div></div>
+  <div class="divider" id="div1"></div>
+  <div id="outPane"><h2>📇 产出区 <button class="mini-btn" style="float:right;margin-top:-2px" onclick="document.getElementById('out').innerHTML=''">清空</button></h2><div id="out"><p id="outHint" style="color:#8a93a8;font-size:13px;">概念卡 / 学习页 / 图解 / 文章会出现在这里。新内容堆在最上面，旧的往下留。</p></div></div>
+  <div class="divider" id="div2"></div>
   <div id="graphPane">
     <h2>🕸️ 知识图谱（点节点看详情）</h2>
     <div id="graphLegend">
@@ -139,6 +143,35 @@ const $ = id => document.getElementById(id);
 const esc = t => (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 
 function showStatus(t) { const s=$('status'); if(!t){s.style.display='none';return;} s.textContent=t; s.style.display='block'; }
+/* 产出区：新内容堆最上面，旧的往下留（不再互相覆盖） */
+function showOut(html) {
+  const hint = $('outHint'); if (hint) hint.remove();
+  const w = document.createElement('div'); w.innerHTML = html;
+  $('out').prepend(w);
+  $('outPane').scrollTop = 0;
+}
+
+/* 分栏拖拽：拖分隔条调整左右栏宽度 */
+(function () {
+  const main = document.querySelector('main');
+  function drag(divId, getW) {
+    $(divId).addEventListener('mousedown', e => {
+      e.preventDefault();
+      const move = ev => {
+        const cols = getComputedStyle(main).gridTemplateColumns.split(' ');
+        const w = getW(ev);
+        if (divId === 'div1') cols[0] = Math.max(260, Math.min(w, innerWidth * 0.5)) + 'px';
+        else cols[4] = Math.max(240, Math.min(w, innerWidth * 0.55)) + 'px';
+        main.style.gridTemplateColumns = cols.join(' ');
+        if (network) network.fit();
+      };
+      const up = () => { removeEventListener('mousemove', move); removeEventListener('mouseup', up); };
+      addEventListener('mousemove', move); addEventListener('mouseup', up);
+    });
+  }
+  drag('div1', ev => ev.clientX);
+  drag('div2', ev => innerWidth - ev.clientX);
+})();
 function addMsg(role, text) {
   const d = document.createElement('div');
   d.className = 'msg ' + role; d.textContent = text;
@@ -182,12 +215,12 @@ async function loadProfile() {
 
 function fillAndSend(text) { $('chatInput').value = text; send(); }
 function renderConceptDetail(d) {
-  $('out').innerHTML = `<div class="card"><h3>🕸️ ${esc(d.name)}</h3>
+  showOut(`<div class="card"><h3>🕸️ ${esc(d.name)}</h3>
     <div class="section"><span class="label">掌握度：</span>${esc(d.mastery)}　<span class="label">来源：</span>${esc(d.source)}</div>
     <div class="section" style="white-space:pre-wrap">${esc(d.body)}</div>
     ${d.related.length ? `<div class="section">相关：${d.related.map(x=>`<span class="learned">${esc(x)}</span>`).join('')}</div>` : ''}
-    <button class="mini-btn" onclick="quizMe('${esc(d.name)}')">🎯 考考我</button>
-    <div id="quizbox"></div></div>`;
+    <button class="mini-btn" onclick="quizMe(this,'${esc(d.name)}')">🎯 考考我</button>
+    <div id="quizbox"></div></div>`);
 }
 
 /* ---------- 考考我 ---------- */
@@ -210,31 +243,32 @@ async function judge(id, concept) {
   fb.textContent = (d.pass ? '✅ ' : '💡 ') + (d.feedback||'') + (d.mastery ? `（掌握度 → ${d.mastery}）` : '');
   refreshGraph();
 }
-async function quizMe(concept) {
+async function quizMe(btn, concept) {
   showStatus('出题中…');
   const d = await (await fetch('/api/quiz',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({concept})})).json();
   showStatus('');
-  const box = $('quizbox') || $('out');
-  box.innerHTML = `<div class="card"><h3>🎯 考考你：${esc(concept)}</h3>${quizBlock(d.questions, concept)}</div>`;
+  const card = btn && btn.closest ? btn.closest('.card') : null;
+  if (card) card.insertAdjacentHTML('beforeend', `<div class="card"><h3>🎯 考考你：${esc(concept)}</h3>${quizBlock(d.questions, concept)}</div>`);
+  else showOut(`<div class="card"><h3>🎯 考考你：${esc(concept)}</h3>${quizBlock(d.questions, concept)}</div>`);
 }
 
 /* ---------- 产出渲染 ---------- */
 function renderAsk(d) {
   const c = d.card;
-  $('out').innerHTML = `<div class="card"><h3>${esc(c.concept)}</h3>
+  showOut(`<div class="card"><h3>${esc(c.concept)}</h3>
     <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
     ${c.analogy?`<div class="section"><span class="label">举个例子（你熟的）：</span>${esc(c.analogy)}</div>`:''}
     ${c.hook?`<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>`:''}
     ${c.warning?`<div class="warning">⚠️ ${esc(c.warning)}</div>`:''}
     ${d.learned_before?.length?`<div class="section">你学过：${d.learned_before.map(x=>`<span class="learned">${esc(x)}</span>`).join('')}</div>`:''}
     ${d.audio_url?`<audio controls src="${d.audio_url}"></audio>`:''}
-    <button class="mini-btn" onclick="quizMe('${esc(c.concept)}')">🎯 考考我</button>
+    <button class="mini-btn" onclick="quizMe(this,'${esc(c.concept)}')">🎯 考考我</button>
     <div id="quizbox"></div>
-    <div class="events">${(d.memory_events||[]).join('；')}</div></div>`;
+    <div class="events">${(d.memory_events||[]).join('；')}</div></div>`);
 }
 function renderLearn(d) {
-  $('out').innerHTML = (d.pages||[]).map(pg => pg.error ? `<div class="card">${esc(pg.error)}</div>` : `
+  showOut((d.pages||[]).map(pg => pg.error ? `<div class="card">${esc(pg.error)}</div>` : `
     <div class="card"><h3>📖 学习页</h3>
       <div class="section"><span class="label">一句话：</span>${esc(pg.summary)}</div>
       ${(pg.walkthrough||[]).map(w=>`<div class="walk-item">▸ <b>${esc(w.heading)}</b><br>${esc(w.note)}</div>`).join('')}
@@ -244,32 +278,32 @@ function renderLearn(d) {
       ${c.analogy?`<div class="section"><span class="label">举个例子：</span>${esc(c.analogy)}</div>`:''}
       ${c.hook?`<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>`:''}</div>`).join('')}
     ${(pg.quiz||[]).length?`<div class="card"><h3>✍️ 检验一下</h3>${quizBlock(pg.quiz, pg.cards[0]?.name||'')}</div>`:''}
-    <div class="events">${(pg.memory_events||[]).join('；')}</div>`).join('');
+    <div class="events">${(pg.memory_events||[]).join('；')}</div>`).join(''));
 }
 function renderMentor(d) {
   const m = d.mentor;
-  $('out').innerHTML = `<div class="card"><h3>🧭 攻坚路径：${esc(d.topic)}</h3>
+  showOut(`<div class="card"><h3>🧭 攻坚路径：${esc(d.topic)}</h3>
     <div class="section"><span class="label">目标：</span>${esc(m.goal)}</div>
     ${(m.steps||[]).map((s,i)=>`<div class="path-step"><b>第${i+1}步 · ${esc(s.concept)}</b><br>${esc(s.why)}<br><span style="color:#7ee2a8">串联：${esc(s.connect)}</span></div>`).join('')}
-    <div class="events">按顺序在左边提问即可，我会陪你一步步学</div></div>`;
+    <div class="events">按顺序在左边提问即可，我会陪你一步步学</div></div>`);
 }
 function renderCreate(d) {
-  $('out').innerHTML = `<div class="card"><h3>✍️ ${esc(d.article.title)}</h3>
+  showOut(`<div class="card"><h3>✍️ ${esc(d.article.title)}</h3>
     <pre class="article">${esc(d.article.article)}</pre>
-    <button class="mini-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('pre').textContent)">📋 复制原稿</button></div>`;
+    <button class="mini-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('pre').textContent)">📋 复制原稿</button></div>`);
 }
 function renderViz(d) {
-  $('out').innerHTML = `<div class="card"><h3>🎬 ${esc(d.viz.title)}</h3>
-    <iframe class="viz" sandbox="allow-scripts" srcdoc="${esc(d.viz.html).replace(/"/g,'&quot;')}"></iframe></div>`;
+  showOut(`<div class="card"><h3>🎬 ${esc(d.viz.title)}</h3>
+    <iframe class="viz" sandbox="allow-scripts" srcdoc="${esc(d.viz.html).replace(/"/g,'&quot;')}"></iframe></div>`);
 }
 async function showInbox() {
   const d = await (await fetch('/api/inbox')).json();
-  $('out').innerHTML = `<div class="card"><h3>📥 待学习区（${d.items.length}）</h3></div>` +
+  showOut(`<div class="card"><h3>📥 待学习区（${d.items.length}）</h3></div>` +
     (d.items.length ? d.items.map(i=>`<div class="inbox-item"><b>${esc(i['标题'])}</b>
       <div class="hook">种草点：${esc(i['种草点'])}　·　存于 ${esc(i['存入时间'])}</div>
       <button class="mini-btn" onclick="learnInbox('${esc(i._file)}')">📖 开始学</button>
       <button class="mini-btn" onclick="podcastInbox('${esc(i._file)}')">🎧 听个大概</button></div>`).join('')
-    : '<div class="card">缓存区是空的。丢个链接说"先存着"试试。</div>');
+    : '<div class="card">缓存区是空的。丢个链接说"先存着"试试。</div>'));
 }
 async function podcastInbox(file) {
   showStatus('做 60 秒播客中…');
@@ -277,10 +311,10 @@ async function podcastInbox(file) {
     body:JSON.stringify({file})})).json();
   showStatus('');
   if (d.script) {
-    $('out').innerHTML = `<div class="card"><h3>🎧 听个大概：${esc(d.title)}</h3>
+    showOut(`<div class="card"><h3>🎧 听个大概：${esc(d.title)}</h3>
       ${d.audio_url?`<audio controls autoplay src="${d.audio_url}"></audio>`:''}
       <div class="section" style="white-space:pre-wrap">${esc(d.script)}</div>
-      <div class="events">听完想深学就回待学习区点「开始学」</div></div>`;
+      <div class="events">听完想深学就回待学习区点「开始学」</div></div>`);
   }
   addMsg('bot', d.reply || d.error || '出了点问题');
 }
@@ -324,7 +358,7 @@ async function send() {
     addMsg('bot', d.reply || '好了。');
     if (d.type==='explain') renderAsk(d);
     else if (d.type==='learn') renderLearn(d);
-    else if (d.type==='quiz') { $('out').innerHTML = `<div class="card"><h3>🎯 考考你：${esc(d.concept)}</h3>${quizBlock(d.quiz, d.concept)}</div>`; }
+    else if (d.type==='quiz') { showOut(`<div class="card"><h3>🎯 考考你：${esc(d.concept)}</h3>${quizBlock(d.quiz, d.concept)}</div>`); }
     else if (d.type==='mentor') renderMentor(d);
     else if (d.type==='create') renderCreate(d);
     else if (d.type==='visualize') renderViz(d);

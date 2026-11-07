@@ -320,6 +320,19 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
     valid_files = [f for f in files if f.filename]
     url_match = URL_PATTERN.search(text)
 
+    # 只丢图不说话 = 进收件箱（低摩擦收集，不打断）
+    if valid_files and not text and all(
+            Path(f.filename or "").suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
+            for f in valid_files):
+        saved = []
+        for f in valid_files[:3]:
+            data = await f.read()
+            stem = memory.add_image_to_inbox(f.filename or "截图", data, _ocr_image(data))
+            saved.append(stem)
+        n = len(saved)
+        return {"type": "save", "reply": f"{n} 张图收进待学习区了 📥 有空点「开始学」或「听个大概」",
+                "inbox": memory.list_inbox()}
+
     # 文件优先：直接走学习
     if valid_files:
         pages, highlight = [], []
@@ -346,8 +359,13 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
         return JSONResponse({"error": "说点什么，或者拖个文件/贴个链接"}, status_code=400)
 
     # LLM 意图路由
-    route = brain.route_intent(text, has_files=False, has_url=bool(url_match)) if brain.available() \
-        else {"intent": "explain", "signals": [], "concepts": []}
+    bare_url = url_match and not text.replace(url_match.group(0), "").strip(" ，,。：:")
+    if bare_url:
+        # 只丢链接不说话 = 先收进待学习区，不用路由猜
+        route = {"intent": "save", "signals": [], "concepts": []}
+    else:
+        route = brain.route_intent(text, has_files=False, has_url=bool(url_match)) if brain.available() \
+            else {"intent": "explain", "signals": [], "concepts": []}
     intent = route.get("intent", "explain")
     written = memory.append_profile_signals(route.get("signals", []))
     signal_note = f"（记住了：{written[0]}）" if written else ""
@@ -488,12 +506,12 @@ def inbox_list():
 async def inbox_learn(payload: dict):
     """待学习区 → 现在学（重新抓取正文走学习页）。"""
     file_stem = payload.get("file", "")
-    items = {i.get("_file"): i for i in memory.list_inbox()}
-    item = items.get(file_stem)
-    if not item:
+    loaded = memory.load_inbox_item(file_stem)
+    if not loaded:
         return JSONResponse({"error": "条目不存在"}, status_code=404)
+    item, cached_body = loaded
     url = item.get("链接", "")
-    raw = _fetch_url_text(url) if url.startswith("http") else ""
+    raw = cached_body.strip() if cached_body.strip() else (_fetch_url_text(url) if url.startswith("http") else "")
     if len(raw) < 100:
         return {"type": "chat", "reply": "这篇抓不到正文了，把正文贴给我吧。"}
     page = await _learn_pipeline_v2(item.get("标题", "待学习资料"), raw)
@@ -506,13 +524,13 @@ async def inbox_learn(payload: dict):
 async def inbox_podcast(payload: dict):
     """听个大概：只出 60 秒播客摘要，不建档不消耗整块时间（S2 碎片消化）。"""
     file_stem = payload.get("file", "")
-    items = {i.get("_file"): i for i in memory.list_inbox()}
-    item = items.get(file_stem)
-    if not item:
+    loaded = memory.load_inbox_item(file_stem)
+    if not loaded:
         return JSONResponse({"error": "条目不存在"}, status_code=404)
+    item, cached_body = loaded
     url = str(item.get("链接", ""))
-    raw = _fetch_url_text(url) if url.startswith("http") else ""
-    src = raw[:2500] if len(raw) > 300 else f"标题：{item.get('标题')}\n种草点：{item.get('种草点')}"
+    raw = cached_body.strip() if cached_body.strip() else (_fetch_url_text(url) if url.startswith("http") else "")
+    src = raw[:2500] if len(raw) > 200 else f"标题：{item.get('标题')}\n种草点：{item.get('种草点')}"
     script = ""
     if brain.available():
         script = brain._chat(
