@@ -3,190 +3,260 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>织识 KnowWeave — 记得你学过什么的 AI 学习助手</title>
+<title>织识 KnowWeave</title>
 <script src="/static/vendor/vis-network.min.js"></script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0f1420; color: #e8eaf0; height: 100vh; display: flex; flex-direction: column; }
-  header { padding: 14px 24px; border-bottom: 1px solid #232b3d; display: flex; align-items: baseline; gap: 12px; }
-  header h1 { font-size: 20px; color: #7ec8ff; }
-  header .tagline { font-size: 13px; color: #8a93a8; }
-  main { flex: 1; display: grid; grid-template-columns: 340px 1fr 1fr; gap: 12px; padding: 12px; min-height: 0; }
-  .pane { background: #171e2e; border: 1px solid #232b3d; border-radius: 12px; padding: 16px; overflow-y: auto; }
-  .pane h2 { font-size: 14px; color: #8a93a8; margin-bottom: 12px; font-weight: 600; }
-  textarea { width: 100%; height: 110px; background: #0f1420; color: #e8eaf0; border: 1px solid #2c3650; border-radius: 8px; padding: 10px; font-size: 14px; resize: vertical; }
-  button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; cursor: pointer; margin-top: 10px; }
-  button:hover { background: #2563eb; }
-  button.secondary { background: #2c3650; }
-  input[type=file] { margin-top: 10px; font-size: 12px; color: #8a93a8; }
-  .card { background: #0f1420; border: 1px solid #2c3650; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
-  .card h3 { color: #7ec8ff; font-size: 18px; margin-bottom: 8px; }
-  .card .section { margin-top: 10px; font-size: 14px; line-height: 1.7; }
-  .card .label { color: #f5b942; font-weight: 600; }
-  .card .warning { background: #3a2a1a; border: 1px solid #f5b942; border-radius: 8px; padding: 8px 12px; margin-top: 10px; font-size: 13px; }
-  .learned { display: inline-block; background: #1d3a2a; color: #7ee2a8; border-radius: 6px; padding: 2px 8px; margin: 2px; font-size: 12px; }
-  .events { font-size: 12px; color: #8a93a8; margin-top: 8px; }
-  audio { width: 100%; margin-top: 10px; }
-  #graph { width: 100%; height: 100%; min-height: 300px; }
-  .loading { color: #8a93a8; font-size: 13px; margin-top: 10px; }
-  .quiz-item { background: #131a29; border: 1px solid #2c3650; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
-  .quiz-item .q { font-size: 13px; color: #7ec8ff; margin-bottom: 6px; }
-  .quiz-item input { width: 100%; background: #0f1420; color: #e8eaf0; border: 1px solid #2c3650; border-radius: 6px; padding: 8px; font-size: 13px; }
-  .quiz-item .fb { font-size: 13px; margin-top: 6px; line-height: 1.6; }
-  .quiz-item .fb.pass { color: #7ee2a8; }
-  .quiz-item .fb.fail { color: #f5b942; }
-  .quiz-item button { padding: 5px 12px; font-size: 12px; margin-top: 6px; }
-  .mini-btn { padding: 4px 10px; font-size: 12px; margin-top: 8px; background: #2c3650; }
-  .walk-item { font-size: 13px; line-height: 1.7; margin-top: 8px; }
-  .walk-item b { color: #7ec8ff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#0f1420; color:#e8eaf0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { padding:10px 20px; border-bottom:1px solid #232b3d; display:flex; align-items:center; gap:14px; }
+  header h1 { font-size:18px; color:#7ec8ff; }
+  header .tagline { font-size:12px; color:#8a93a8; flex:1; }
+  header button { background:#2c3650; color:#e8eaf0; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; }
+  header button:hover { background:#3b82f6; }
+  main { flex:1; display:grid; grid-template-columns:400px 1fr 360px; min-height:0; }
+
+  /* 左：对话区 */
+  #chatPane { border-right:1px solid #232b3d; display:flex; flex-direction:column; }
+  #chatLog { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:88%; padding:10px 14px; border-radius:12px; font-size:14px; line-height:1.65; white-space:pre-wrap; word-break:break-word; }
+  .msg.user { align-self:flex-end; background:#3b82f6; color:#fff; }
+  .msg.bot { align-self:flex-start; background:#1a2235; border:1px solid #2c3650; }
+  .msg.sys { align-self:center; background:none; color:#8a93a8; font-size:12px; }
+  #inputBar { padding:12px; border-top:1px solid #232b3d; }
+  #inputWrap { display:flex; gap:8px; align-items:flex-end; background:#171e2e; border:1px solid #2c3650; border-radius:12px; padding:8px; }
+  #inputWrap.dragover { border-color:#7ec8ff; background:#1a2a4a; }
+  #chatInput { flex:1; background:none; border:none; color:#e8eaf0; font-size:14px; resize:none; outline:none; max-height:120px; font-family:inherit; }
+  #chatInput::placeholder { color:#556; }
+  .iconBtn { background:none; border:none; font-size:18px; cursor:pointer; padding:4px 6px; color:#8a93a8; }
+  .iconBtn:hover { color:#7ec8ff; }
+  #sendBtn { background:#3b82f6; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:14px; cursor:pointer; }
+  #fileChips { display:flex; flex-wrap:wrap; gap:6px; padding:0 4px 6px; }
+  .fchip { background:#1d3a2a; color:#7ee2a8; border-radius:6px; padding:2px 8px; font-size:12px; }
+
+  /* 中：产出区 */
+  #outPane { overflow-y:auto; padding:16px; }
+  #outPane h2 { font-size:13px; color:#8a93a8; margin-bottom:12px; font-weight:600; }
+  .card { background:#171e2e; border:1px solid #2c3650; border-radius:12px; padding:18px; margin-bottom:14px; }
+  .card h3 { color:#7ec8ff; font-size:17px; margin-bottom:8px; }
+  .card .section { margin-top:10px; font-size:14px; line-height:1.75; }
+  .label { color:#f5b942; font-weight:600; }
+  .warning { background:#3a2a1a; border:1px solid #f5b942; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:13px; }
+  .learned { display:inline-block; background:#1d3a2a; color:#7ee2a8; border-radius:6px; padding:2px 8px; margin:2px; font-size:12px; }
+  .events { font-size:12px; color:#8a93a8; margin-top:10px; }
+  audio { width:100%; margin-top:10px; }
+  .walk-item { font-size:13.5px; line-height:1.7; margin-top:10px; }
+  .walk-item b { color:#7ec8ff; }
+  .quiz-item { background:#131a29; border:1px solid #2c3650; border-radius:8px; padding:12px; margin-top:10px; }
+  .quiz-item .q { font-size:13.5px; color:#7ec8ff; margin-bottom:8px; }
+  .quiz-item input { width:100%; background:#0f1420; color:#e8eaf0; border:1px solid #2c3650; border-radius:6px; padding:8px; font-size:13px; }
+  .quiz-item .fb { font-size:13px; margin-top:8px; line-height:1.65; }
+  .quiz-item .fb.pass { color:#7ee2a8; } .quiz-item .fb.fail { color:#f5b942; }
+  .mini-btn { background:#2c3650; color:#e8eaf0; border:none; border-radius:7px; padding:5px 12px; font-size:12px; cursor:pointer; margin-top:8px; }
+  .mini-btn:hover { background:#3b82f6; }
+  .path-step { border-left:3px solid #3b82f6; padding:8px 0 8px 14px; margin:10px 0; }
+  .path-step b { color:#7ec8ff; }
+  .inbox-item { background:#171e2e; border:1px solid #2c3650; border-radius:10px; padding:14px; margin-bottom:10px; }
+  .inbox-item b { color:#7ec8ff; }
+  .inbox-item .hook { font-size:13px; color:#8a93a8; margin:6px 0; }
+  iframe.viz { width:100%; height:70vh; border:1px solid #2c3650; border-radius:12px; background:#0f1420; }
+  pre.article { white-space:pre-wrap; font-family:inherit; font-size:13.5px; line-height:1.8; }
+
+  /* 右：图谱区 */
+  #graphPane { border-left:1px solid #232b3d; display:flex; flex-direction:column; }
+  #graphPane h2 { font-size:13px; color:#8a93a8; padding:12px 14px 0; font-weight:600; }
+  #graph { flex:1; min-height:0; }
+  #status { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1a2235; border:1px solid #3b82f6; padding:8px 18px; border-radius:20px; font-size:13px; display:none; }
 </style>
 </head>
 <body>
 <header>
   <h1>织识 KnowWeave</h1>
   <span class="tagline">记得你学过什么、也知道你是谁的 AI 学习助手</span>
+  <button onclick="showInbox()">📥 待学习 <span id="inboxCount"></span></button>
 </header>
 <main>
-  <div class="pane">
-    <h2>✏️ 输入</h2>
-    <textarea id="question" placeholder="直接提问，例如：回归测试是什么？"></textarea>
-    <button onclick="ask()">提问</button>
-    <div style="margin: 16px 0 8px; color:#8a93a8; font-size:13px;">—— 或喂资料 ——</div>
-    <textarea id="material" placeholder="粘贴文章 / 推文 / 笔记正文"></textarea>
-    <input type="file" id="file" accept=".md,.txt,.pdf,.png,.jpg,.jpeg,.webp">
-    <button class="secondary" onclick="ingest()">入库学习</button>
-    <div class="loading" id="status"></div>
+  <div id="chatPane">
+    <div id="chatLog">
+      <div class="msg sys">随便丢：提问 / 贴链接 / 拖文件 / 拖截图。"先存着"会进待学习区。</div>
+    </div>
+    <div id="inputBar">
+      <div id="fileChips"></div>
+      <div id="inputWrap">
+        <textarea id="chatInput" rows="2" placeholder="问点什么，或把资料丢给我…"></textarea>
+        <button class="iconBtn" onclick="document.getElementById('fileInput').click()" title="附件">📎</button>
+        <button id="sendBtn" onclick="send()">发送</button>
+      </div>
+      <input type="file" id="fileInput" multiple style="display:none" accept=".md,.txt,.pdf,.png,.jpg,.jpeg,.webp">
+    </div>
   </div>
-  <div class="pane">
-    <h2>📇 概念卡</h2>
-    <div id="result"><p style="color:#8a93a8;font-size:13px;">问点什么，或喂一篇资料。</p></div>
-  </div>
-  <div class="pane">
-    <h2>🕸️ 知识图谱</h2>
-    <div id="graph"></div>
-  </div>
+  <div id="outPane"><h2>📇 产出区</h2><div id="out"><p style="color:#8a93a8;font-size:13px;">概念卡 / 学习页 / 图解 / 文章会出现在这里。</p></div></div>
+  <div id="graphPane"><h2>🕸️ 知识图谱（点节点看详情）</h2><div id="graph"></div></div>
 </main>
+<div id="status"></div>
+
 <script>
-let network = null;
+let network = null, pendingFiles = [];
+const $ = id => document.getElementById(id);
+const esc = t => (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 
+function showStatus(t) { const s=$('status'); if(!t){s.style.display='none';return;} s.textContent=t; s.style.display='block'; }
+function addMsg(role, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + role; d.textContent = text;
+  $('chatLog').appendChild(d); $('chatLog').scrollTop = $('chatLog').scrollHeight;
+}
+
+/* ---------- 图谱 ---------- */
 async function refreshGraph(highlight = []) {
-  const res = await fetch('/api/graph');
-  const data = await res.json();
+  const data = await (await fetch('/api/graph')).json();
+  const colorByMastery = m => ({ 'initial':'#2c3650', '理解了':'#2a4a6a', '能讲给别人':'#1d6a4a', '能用':'#7ee2a8' }[m] || '#2c3650');
   const nodes = new vis.DataSet(data.nodes.map(n => ({
-    id: n.id, label: n.label,
-    color: highlight.includes(n.id)
-      ? { background: '#f5b942', border: '#ffd97a' }
-      : { background: '#2c3650', border: '#3b82f6' },
-    font: { color: '#e8eaf0' },
-    title: `掌握度: ${n.掌握度} · 更新: ${n.更新时间}`
+    id:n.id, label:n.label,
+    color:{ background: highlight.includes(n.id) ? '#f5b942' : colorByMastery(n.掌握度), border:'#3b82f6' },
+    font:{ color:'#e8eaf0' }, title:`掌握度: ${n.掌握度} · 更新: ${n.更新时间}`
   })));
-  const edges = new vis.DataSet(data.edges);
-  network = new vis.Network(document.getElementById('graph'),
-    { nodes, edges },
-    { physics: { stabilization: true }, edges: { color: '#3b82f6' } });
+  network = new vis.Network($('graph'), {nodes, edges:new vis.DataSet(data.edges)},
+    { physics:{stabilization:true}, edges:{color:'#3b82f6'} });
+  network.on('click', async p => {
+    if (!p.nodes.length) return;
+    const d = await (await fetch('/api/concept/' + encodeURIComponent(p.nodes[0]))).json();
+    if (!d.error) renderConceptDetail(d);
+  });
+}
+function renderConceptDetail(d) {
+  $('out').innerHTML = `<div class="card"><h3>🕸️ ${esc(d.name)}</h3>
+    <div class="section"><span class="label">掌握度：</span>${esc(d.mastery)}　<span class="label">来源：</span>${esc(d.source)}</div>
+    <div class="section" style="white-space:pre-wrap">${esc(d.body)}</div>
+    ${d.related.length ? `<div class="section">相关：${d.related.map(x=>`<span class="learned">${esc(x)}</span>`).join('')}</div>` : ''}
+    <button class="mini-btn" onclick="quizMe('${esc(d.name)}')">🎯 考考我</button>
+    <div id="quizbox"></div></div>`;
 }
 
+/* ---------- 考考我 ---------- */
 let quizSeq = 0;
-
-function esc(t) { return (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-
 function quizBlock(questions, concept) {
-  return questions.map(item => {
-    const id = ++quizSeq;
-    return `<div class="quiz-item" id="quiz-${id}">
-      <div class="q">📝 ${item.q}</div>
+  return (questions||[]).map(item => { const id = ++quizSeq;
+    return `<div class="quiz-item"><div class="q">📝 ${esc(item.q)}</div>
       <input id="qa-${id}" placeholder="用自己的话回答…">
-      <button onclick="judge(${id}, '${concept.replace(/'/g, '')}')">提交</button>
+      <button class="mini-btn" onclick="judge(${id},'${esc(concept)}')">提交</button>
       <div class="fb" id="qf-${id}"></div>
-      <textarea style="display:none" id="qr-${id}">${esc(item.a)}</textarea>
-      <textarea style="display:none" id="qq-${id}">${item.q}</textarea>
-    </div>`;
-  }).join('');
+      <input type="hidden" id="qr-${id}" value="${esc(item.a)}">
+      <input type="hidden" id="qq-${id}" value="${esc(item.q)}"></div>`; }).join('');
 }
-
 async function judge(id, concept) {
-  const answer = document.getElementById(`qa-${id}`).value.trim();
-  if (!answer) return;
-  const fb = document.getElementById(`qf-${id}`);
-  fb.className = 'fb'; fb.textContent = '判题中…';
-  const res = await fetch('/api/quiz/judge', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ concept, question: document.getElementById(`qq-${id}`).value,
-      reference: document.getElementById(`qr-${id}`).value, answer }) });
-  const data = await res.json();
-  fb.className = 'fb ' + (data.pass ? 'pass' : 'fail');
-  fb.textContent = (data.pass ? '✅ ' : '💡 ') + (data.feedback || '') + (data.mastery ? `（掌握度 → ${data.mastery}）` : '');
+  const answer = $('qa-'+id).value.trim(); if (!answer) return;
+  const fb = $('qf-'+id); fb.className='fb'; fb.textContent='判题中…';
+  const d = await (await fetch('/api/quiz/judge',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({concept, question:$('qq-'+id).value, reference:$('qr-'+id).value, answer})})).json();
+  fb.className = 'fb ' + (d.pass ? 'pass' : 'fail');
+  fb.textContent = (d.pass ? '✅ ' : '💡 ') + (d.feedback||'') + (d.mastery ? `（掌握度 → ${d.mastery}）` : '');
   refreshGraph();
 }
-
 async function quizMe(concept) {
-  const box = document.getElementById(`quizbox-${concept}`);
-  box.innerHTML = '<div class="loading">出题中…</div>';
-  const res = await fetch('/api/quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ concept }) });
-  const data = await res.json();
-  box.innerHTML = data.error ? `<div class="fb fail">${data.error}</div>` : quizBlock(data.questions || [], concept);
+  showStatus('出题中…');
+  const d = await (await fetch('/api/quiz',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({concept})})).json();
+  showStatus('');
+  const box = $('quizbox') || $('out');
+  box.innerHTML = `<div class="card"><h3>🎯 考考你：${esc(concept)}</h3>${quizBlock(d.questions, concept)}</div>`;
 }
 
-function renderResult(data) {
-  const el = document.getElementById('result');
-  if (data.error) { el.innerHTML = `<p style="color:#ff8080">${data.error}</p>`; return; }
-  if (data.card) {
-    const c = data.card;
-    el.innerHTML = `
-      <div class="card">
-        <h3>${esc(c.concept)}</h3>
-        <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
-        ${c.analogy ? `<div class="section"><span class="label">举个例子（你熟的）：</span>${esc(c.analogy)}</div>` : ''}
-        ${c.hook ? `<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>` : ''}
-        ${c.warning ? `<div class="warning">⚠️ ${esc(c.warning)}</div>` : ''}
-        ${data.learned_before?.length ? `<div class="section">你学过：${data.learned_before.map(x => `<span class="learned">${esc(x)}</span>`).join('')}</div>` : ''}
-        ${data.audio_url ? `<audio controls src="${data.audio_url}"></audio>` : ''}
-        <button class="mini-btn" onclick="quizMe('${(c.concept || '').replace(/'/g, '')}')">🎯 考考我</button>
-        <div id="quizbox-${esc(c.concept)}"></div>
-        <div class="events">${data.memory_events.join('；')}${data.mock ? '（mock 模式）' : ''}</div>
-      </div>`;
-  } else if (data.cards !== undefined) {
-    el.innerHTML = `<div class="card"><h3>📖 学习页</h3>
-      ${data.summary ? `<div class="section"><span class="label">一句话：</span>${esc(data.summary)}</div>` : ''}
-      ${(data.walkthrough || []).map(w => `<div class="walk-item">▸ <b>${esc(w.heading)}</b><br>${esc(w.note)}</div>`).join('')}
-      ${data.audio_url ? `<audio controls src="${data.audio_url}"></audio>` : ''}
-      </div>
-      ${data.cards.map(c => `<div class="card"><h3>${esc(c.name)}</h3>
-        <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
-        ${c.analogy ? `<div class="section"><span class="label">举个例子：</span>${esc(c.analogy)}</div>` : ''}
-        ${c.hook ? `<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>` : ''}
-        <button class="mini-btn" onclick="quizMe('${(c.name || '').replace(/'/g, '')}')">🎯 考考我</button>
-        <div id="quizbox-${esc(c.name)}"></div>
-      </div>`).join('')}
-      ${(data.quiz || []).length ? `<div class="card"><h3>✍️ 检验一下</h3>${quizBlock(data.quiz, data.cards[0]?.name || '')}</div>` : ''}
-      <div class="events" style="padding:0 4px">${(data.memory_events || []).join('；')}${data.mock ? '（mock 模式）' : ''}</div>`;
-  }
+/* ---------- 产出渲染 ---------- */
+function renderAsk(d) {
+  const c = d.card;
+  $('out').innerHTML = `<div class="card"><h3>${esc(c.concept)}</h3>
+    <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
+    ${c.analogy?`<div class="section"><span class="label">举个例子（你熟的）：</span>${esc(c.analogy)}</div>`:''}
+    ${c.hook?`<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>`:''}
+    ${c.warning?`<div class="warning">⚠️ ${esc(c.warning)}</div>`:''}
+    ${d.learned_before?.length?`<div class="section">你学过：${d.learned_before.map(x=>`<span class="learned">${esc(x)}</span>`).join('')}</div>`:''}
+    ${d.audio_url?`<audio controls src="${d.audio_url}"></audio>`:''}
+    <button class="mini-btn" onclick="quizMe('${esc(c.concept)}')">🎯 考考我</button>
+    <div id="quizbox"></div>
+    <div class="events">${(d.memory_events||[]).join('；')}</div></div>`;
 }
-
-async function ask() {
-  const q = document.getElementById('question').value.trim();
-  if (!q) return;
-  document.getElementById('status').textContent = '思考中，顺便翻你的记忆库…';
-  const res = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) });
-  const data = await res.json();
-  document.getElementById('status').textContent = '';
-  renderResult(data);
-  refreshGraph(data.highlight || []);
+function renderLearn(d) {
+  $('out').innerHTML = (d.pages||[]).map(pg => pg.error ? `<div class="card">${esc(pg.error)}</div>` : `
+    <div class="card"><h3>📖 学习页</h3>
+      <div class="section"><span class="label">一句话：</span>${esc(pg.summary)}</div>
+      ${(pg.walkthrough||[]).map(w=>`<div class="walk-item">▸ <b>${esc(w.heading)}</b><br>${esc(w.note)}</div>`).join('')}
+      ${pg.audio_url?`<audio controls src="${pg.audio_url}"></audio>`:''}</div>
+    ${(pg.cards||[]).map(c=>`<div class="card"><h3>${esc(c.name)}</h3>
+      <div class="section"><span class="label">大白话：</span>${esc(c.explanation)}</div>
+      ${c.analogy?`<div class="section"><span class="label">举个例子：</span>${esc(c.analogy)}</div>`:''}
+      ${c.hook?`<div class="section"><span class="label">记忆钩子：</span>${esc(c.hook)}</div>`:''}</div>`).join('')}
+    ${(pg.quiz||[]).length?`<div class="card"><h3>✍️ 检验一下</h3>${quizBlock(pg.quiz, pg.cards[0]?.name||'')}</div>`:''}
+    <div class="events">${(pg.memory_events||[]).join('；')}</div>`).join('');
 }
+function renderMentor(d) {
+  const m = d.mentor;
+  $('out').innerHTML = `<div class="card"><h3>🧭 攻坚路径：${esc(d.topic)}</h3>
+    <div class="section"><span class="label">目标：</span>${esc(m.goal)}</div>
+    ${(m.steps||[]).map((s,i)=>`<div class="path-step"><b>第${i+1}步 · ${esc(s.concept)}</b><br>${esc(s.why)}<br><span style="color:#7ee2a8">串联：${esc(s.connect)}</span></div>`).join('')}
+    <div class="events">按顺序在左边提问即可，我会陪你一步步学</div></div>`;
+}
+function renderCreate(d) {
+  $('out').innerHTML = `<div class="card"><h3>✍️ ${esc(d.article.title)}</h3>
+    <pre class="article">${esc(d.article.article)}</pre>
+    <button class="mini-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('pre').textContent)">📋 复制原稿</button></div>`;
+}
+function renderViz(d) {
+  $('out').innerHTML = `<div class="card"><h3>🎬 ${esc(d.viz.title)}</h3>
+    <iframe class="viz" sandbox="allow-scripts" srcdoc="${esc(d.viz.html).replace(/"/g,'&quot;')}"></iframe></div>`;
+}
+async function showInbox() {
+  const d = await (await fetch('/api/inbox')).json();
+  $('out').innerHTML = `<div class="card"><h3>📥 待学习区（${d.items.length}）</h3></div>` +
+    (d.items.length ? d.items.map(i=>`<div class="inbox-item"><b>${esc(i['标题'])}</b>
+      <div class="hook">种草点：${esc(i['种草点'])}　·　存于 ${esc(i['存入时间'])}</div>
+      <button class="mini-btn" onclick="learnInbox('${esc(i._file)}')">📖 开始学</button></div>`).join('')
+    : '<div class="card">缓存区是空的。丢个链接说"先存着"试试。</div>');
+}
+async function learnInbox(file) {
+  showStatus('学习中…');
+  const d = await (await fetch('/api/inbox/learn',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({file})})).json();
+  showStatus('');
+  if (d.pages) { renderLearn(d); refreshGraph(d.highlight||[]); updateInboxCount(d.inbox); addMsg('bot', d.reply); }
+  else addMsg('bot', d.reply || d.error || '出了点问题');
+}
+function updateInboxCount(items) { if (items) $('inboxCount').textContent = items.length ? `(${items.length})` : ''; }
 
-async function ingest() {
-  const text = document.getElementById('material').value.trim();
-  const file = document.getElementById('file').files[0];
-  if (!text && !file) return;
-  document.getElementById('status').textContent = '解析资料中…';
+/* ---------- 发送 ---------- */
+function collectFiles(fileList) {
+  for (const f of fileList) pendingFiles.push(f);
+  $('fileChips').innerHTML = pendingFiles.map((f,i)=>`<span class="fchip">${esc(f.name)} <a href="javascript:void(0)" onclick="pendingFiles.splice(${i},1);collectFiles([])">×</a></span>`).join('');
+}
+$('fileInput').addEventListener('change', e => { collectFiles(e.target.files); e.target.value=''; });
+document.body.addEventListener('dragover', e => { e.preventDefault(); $('inputWrap').classList.add('dragover'); });
+document.body.addEventListener('dragleave', e => { if (e.target===document.body) $('inputWrap').classList.remove('dragover'); });
+document.body.addEventListener('drop', e => { e.preventDefault(); $('inputWrap').classList.remove('dragover'); collectFiles(e.dataTransfer.files); });
+$('chatInput').addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+async function send() {
+  const text = $('chatInput').value.trim();
+  if (!text && !pendingFiles.length) return;
+  addMsg('user', text || pendingFiles.map(f=>'📎 '+f.name).join(' '));
+  $('chatInput').value = '';
   const form = new FormData();
   form.append('text', text);
-  if (file) form.append('file', file);
-  const res = await fetch('/api/ingest', { method: 'POST', body: form });
-  const data = await res.json();
-  document.getElementById('status').textContent = '';
-  renderResult(data);
-  refreshGraph(data.highlight || []);
+  pendingFiles.forEach(f => form.append('files', f));
+  pendingFiles = []; $('fileChips').innerHTML = '';
+  showStatus('织识思考中…');
+  try {
+    const d = await (await fetch('/api/chat', {method:'POST', body:form})).json();
+    showStatus('');
+    if (d.error) { addMsg('bot', d.error); return; }
+    addMsg('bot', d.reply || '好了。');
+    if (d.type==='explain') renderAsk(d);
+    else if (d.type==='learn') renderLearn(d);
+    else if (d.type==='quiz') { $('out').innerHTML = `<div class="card"><h3>🎯 考考你：${esc(d.concept)}</h3>${quizBlock(d.quiz, d.concept)}</div>`; }
+    else if (d.type==='mentor') renderMentor(d);
+    else if (d.type==='create') renderCreate(d);
+    else if (d.type==='visualize') renderViz(d);
+    else if (d.type==='save') { updateInboxCount(d.inbox); }
+    if (d.highlight) refreshGraph(d.highlight);
+  } catch (e) { showStatus(''); addMsg('bot', '出错了：' + e.message); }
 }
 
 refreshGraph();

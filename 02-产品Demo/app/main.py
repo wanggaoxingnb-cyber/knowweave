@@ -255,3 +255,246 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=False)
+
+
+# ==================== v2：统一入口 + 意图路由 ====================
+
+URL_PATTERN = __import__("re").compile(r"https?://[^\s)\]>\"']+")
+
+
+def _fetch_url_text(url: str) -> str:
+    import re as _re
+    try:
+        import httpx
+        resp = httpx.get(url, timeout=20, follow_redirects=True,
+                         headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"})
+        html = resp.text
+        html = _re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=_re.S | _re.I)
+        html = _re.sub(r"</(p|div|h\d|li|br)>", "\n", html, flags=_re.I)
+        text = _re.sub(r"<[^>]+>", "", html)
+        text = _re.sub(r"[ \t]+", " ", text)
+        return _re.sub(r"\n\s*\n+", "\n", text).strip()
+    except Exception as e:
+        print(f"[fetch] failed: {e}")
+        return ""
+
+
+async def _learn_pipeline_v2(title_hint: str, raw: str) -> dict:
+    events, cards = [], []
+    result = brain.build_learning_page(title_hint, raw, memory.load_profile())
+    for item in result.get("concepts", [])[:3]:
+        sr = memory.save_concept(item.get("name", "未命名概念"),
+                                 explanation=item.get("explanation", ""),
+                                 hook=item.get("hook", ""),
+                                 source=title_hint, related=item.get("related", []))
+        events.append(("新建概念" if sr["created"] else "更新概念") + f"「{item.get('name')}」")
+        cards.append(item)
+    memory.append_history(f"[资料入库] {title_hint}", [c.get("name", "") for c in cards], result.get("summary", ""))
+    return {"summary": result.get("summary", ""), "walkthrough": result.get("walkthrough", []),
+            "cards": cards, "quiz": result.get("quiz", []), "memory_events": events,
+            "highlight": [c.get("name", "") for c in cards],
+            "audio_url": await _tts(result.get("podcast_script", ""))}
+
+
+def _graph_brief() -> str:
+    return "、".join(f"{c['名称']}({c['掌握度']})" for c in memory.list_concepts()) or "（空）"
+
+
+def _concepts_brief() -> str:
+    parts = []
+    for c in memory.list_concepts():
+        parts.append(f"【{c['名称']}｜掌握度:{c['掌握度']}】\n{c['body'][:300]}")
+    return "\n\n".join(parts)[:5000]
+
+
+@app.post("/api/chat")
+async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """统一入口：一个输入框通吃一切，LLM 判断意图。"""
+    text = text.strip()
+    valid_files = [f for f in files if f.filename]
+    url_match = URL_PATTERN.search(text)
+
+    # 文件优先：直接走学习
+    if valid_files:
+        pages, highlight = [], []
+        for f in valid_files[:3]:
+            data = await f.read()
+            suffix = Path(f.filename or "").suffix.lower()
+            if suffix == ".pdf":
+                raw = _pdf_text(data)
+            elif suffix in (".png", ".jpg", ".jpeg", ".webp"):
+                raw = _ocr_image(data)
+            else:
+                raw = data.decode("utf-8", errors="ignore")
+            if not raw.strip():
+                pages.append({"error": f"「{f.filename}」没读到内容"})
+                continue
+            page = await _learn_pipeline_v2(f.filename or "上传文件", raw)
+            pages.append(page)
+            highlight += page.get("highlight", [])
+        ok = len([p for p in pages if not p.get("error")])
+        return {"type": "learn", "reply": f"学完 {ok} 份资料，学习页放中间了 👉 底部有检验题，敢不敢答",
+                "pages": pages, "highlight": highlight}
+
+    if not text:
+        return JSONResponse({"error": "说点什么，或者拖个文件/贴个链接"}, status_code=400)
+
+    # LLM 意图路由
+    route = brain.route_intent(text, has_files=False, has_url=bool(url_match)) if brain.available() \
+        else {"intent": "explain", "signals": [], "concepts": []}
+    intent = route.get("intent", "explain")
+    written = memory.append_profile_signals(route.get("signals", []))
+    signal_note = f"（记住了：{written[0]}）" if written else ""
+    profile = memory.load_profile()
+
+    # ---- save：待学习缓存区 ----
+    if intent == "save":
+        if not url_match:
+            return {"type": "chat", "reply": "想存东西的话，把链接一起贴给我就行 📥"}
+        raw = _fetch_url_text(url_match.group(0))
+        if len(raw) < 100:
+            return {"type": "chat", "reply": "这个链接抓不到正文（可能要登录/有反爬）。复制正文贴给我也行。"}
+        hook = raw[:0]
+        if brain.available():
+            try:
+                hook = brain._extract_json(brain._chat(
+                    "用一句话说出这篇资料最值得读的点（30字内），JSON: {\"hook\": \"...\"}", raw[:1500], 200))["hook"]
+            except Exception:
+                hook = raw[:50]
+        title = text.replace(url_match.group(0), "").strip(" ，,。：:")[:30] or url_match.group(0)[:40]
+        memory.add_to_inbox(title, url_match.group(0), hook)
+        return {"type": "save", "reply": f"已存入待学习区 📥 种草点：{hook}{signal_note}",
+                "inbox": memory.list_inbox()}
+
+    # ---- learn：链接学习 ----
+    if intent == "learn" and url_match:
+        raw = _fetch_url_text(url_match.group(0))
+        if len(raw) < 100:
+            return {"type": "chat", "reply": "链接抓不到正文，把正文复制贴给我吧。"}
+        page = await _learn_pipeline_v2(url_match.group(0), raw)
+        return {"type": "learn", "reply": f"学完了，学习页放中间 👉{signal_note}",
+                "pages": [page], "highlight": page["highlight"]}
+
+    # ---- weave：编织 ----
+    if intent == "weave":
+        names = route.get("concepts", [])
+        for n in memory.match_concepts_in_text(text):
+            if n not in names:
+                names.append(n)
+        bodies = {"（用户原话）": text}
+        for n in names:
+            c = memory.load_concept(n)
+            bodies[n] = c["body"] if c else "（概念库中还没有，按通用知识讲）"
+        if brain.available() and names:
+            result = brain.weave_explain(names, profile, bodies)
+            new_links = 0
+            for pair in result.get("links", []):
+                if len(pair) == 2 and memory.add_link(pair[0], pair[1]):
+                    new_links += 1
+            memory.append_history(f"[编织] {text}", names, result.get("relationship", "")[:60])
+            return {"type": "weave", "reply": result.get("relationship", "") + signal_note,
+                    "highlight": names,
+                    "memory_events": [f"图谱新增 {new_links} 条连线" if new_links else "连线已存在"]}
+        return {"type": "chat", "reply": "你想连哪两个概念？再说具体点。"}
+
+    # ---- quiz：检验 ----
+    if intent == "quiz":
+        concepts = route.get("concepts", []) or memory.match_concepts_in_text(text)
+        target = None
+        for n in concepts:
+            if memory.load_concept(n):
+                target = n
+                break
+        if not target:
+            recent = memory.list_concepts()
+            if not recent:
+                return {"type": "chat", "reply": "概念库还是空的，先学点东西再来考你 😄"}
+            target = recent[-1]["名称"]
+        concept = memory.load_concept(target)
+        quiz_data = brain.make_quiz(target, concept["body"], profile) if brain.available() \
+            else {"questions": [{"q": f"用自己的话讲讲{target}？", "a": "mock"}]}
+        return {"type": "quiz", "reply": f"来，考考你「{target}」💪 题放中间了，答完我判",
+                "quiz": quiz_data.get("questions", []), "concept": target, "highlight": [target]}
+
+    # ---- mentor：导师 ----
+    if intent == "mentor":
+        topic = route.get("topic") or text
+        if brain.available():
+            result = brain.mentor_path(topic, profile, _graph_brief())
+            memory.append_history(f"[导师] {topic}", [], result.get("goal", ""))
+            return {"type": "mentor", "reply": f"路径给你排好了，放中间 🧭 从第一步开始就行{signal_note}",
+                    "mentor": result, "topic": topic}
+        return {"type": "chat", "reply": "mock 模式不支持导师模式"}
+
+    # ---- create：输出倒逼输出 ----
+    if intent == "create":
+        if brain.available():
+            result = brain.create_article(text, profile, _concepts_brief(), memory.read_history_brief())
+            memory.append_history("[输出] 生成文章", [], result.get("title", ""))
+            return {"type": "create", "reply": f"原稿写好了，放中间 ✍️{signal_note}",
+                    "article": result}
+        return {"type": "chat", "reply": "mock 模式不支持输出模块"}
+
+    # ---- visualize：演绎 ----
+    if intent == "visualize":
+        names = route.get("concepts", []) or memory.match_concepts_in_text(text)
+        target = names[0] if names else text[:10]
+        concept = memory.load_concept(target)
+        if brain.available():
+            result = brain.visualize_concept(target, concept["body"] if concept else "", profile)
+            return {"type": "visualize", "reply": f"给「{target}」做了个图解，中间看 🎬",
+                    "viz": result, "highlight": [target]}
+        return {"type": "chat", "reply": "mock 模式不支持演绎"}
+
+    # ---- chat：闲聊 ----
+    if intent == "chat":
+        reply = ""
+        if brain.available():
+            reply = brain._chat(
+                "你是织识 KnowWeave，记得用户学过什么的 AI 学习助手。简短自然地回复（80字内），"
+                "可顺势引导学习。用户画像：\n" + profile + "\n已学概念：" + _graph_brief(), text, 200)
+        return {"type": "chat", "reply": reply or "我在，说吧。" + signal_note}
+
+    # ---- explain：讲解（默认） ----
+    result = _ask_pipeline(text)
+    result["audio_url"] = await _tts(result["card"].get("podcast_script", ""))
+    result["type"] = "explain"
+    result["reply"] = (result["card"].get("explanation", "")[:100] + "… 详细卡片在中间 👉") if result.get("card") else "嗯？"
+    if signal_note:
+        result["reply"] += signal_note
+    return result
+
+
+@app.get("/api/inbox")
+def inbox_list():
+    return {"items": memory.list_inbox()}
+
+
+@app.post("/api/inbox/learn")
+async def inbox_learn(payload: dict):
+    """待学习区 → 现在学（重新抓取正文走学习页）。"""
+    file_stem = payload.get("file", "")
+    items = {i.get("_file"): i for i in memory.list_inbox()}
+    item = items.get(file_stem)
+    if not item:
+        return JSONResponse({"error": "条目不存在"}, status_code=404)
+    url = item.get("链接", "")
+    raw = _fetch_url_text(url) if url.startswith("http") else ""
+    if len(raw) < 100:
+        return {"type": "chat", "reply": "这篇抓不到正文了，把正文贴给我吧。"}
+    page = await _learn_pipeline_v2(item.get("标题", "待学习资料"), raw)
+    memory.remove_from_inbox(file_stem)
+    return {"type": "learn", "reply": f"「{item.get('标题')}」学完了，已归档 ✅",
+            "pages": [page], "highlight": page["highlight"], "inbox": memory.list_inbox()}
+
+
+@app.get("/api/concept/{name}")
+def concept_detail_v2(name: str):
+    concept = memory.load_concept(name)
+    if not concept:
+        return JSONResponse({"error": f"概念「{name}」不存在"}, status_code=404)
+    meta = concept["meta"]
+    return {"name": meta.get("名称", name), "mastery": meta.get("掌握度", ""),
+            "source": meta.get("来源", ""), "related": memory.LINK_RE.findall(meta.get("相关概念", "")),
+            "first_learned": meta.get("首次学习时间", ""), "updated": meta.get("更新时间", ""),
+            "body": concept["body"]}

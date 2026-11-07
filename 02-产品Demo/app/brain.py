@@ -136,3 +136,95 @@ def judge_answer(concept_name: str, question: str, reference: str,
 
 def available() -> bool:
     return _client is not None
+
+
+# ---------- v2 新增：意图路由 / 编织 / 导师 / 输出 ----------
+
+INTENTS = ["explain", "learn", "save", "weave", "quiz", "visualize", "mentor", "create", "chat"]
+
+
+def route_intent(text: str, has_files: bool, has_url: bool) -> dict:
+    """LLM 意图路由 + 顺带提取用户信号。返回 {"intent":..., "signals":[...], ...}"""
+    if has_files:
+        return {"intent": "learn", "signals": []}
+    schema = (
+        '{"intent": "以下之一: ' + "/".join(INTENTS) + '",'
+        '"topic": "用户想学的主题（导师意图时填）",'
+        '"concepts": ["文本中提到的概念名"],'
+        '"signals": ["用户这段话里关于他本人的新信息（身份/爱好/熟悉度/学习目标），没有就空数组"],'
+        '"reason": "判断理由，15字内"}'
+    )
+    system = (
+        "你是意图路由器。判断用户这句话的意图：\n"
+        "- explain: 问某个概念/知识点是什么\n"
+        "- learn: 给了资料/文章/链接，想学习它（含'帮我学''总结下这篇'）\n"
+        "- save: 想先存着以后看（'先存着''回头再看''码住'）\n"
+        "- weave: 问两个或多个概念之间的关系/想建立关联\n"
+        "- quiz: 想被测试/检验（'考考我''出个题'）\n"
+        "- visualize: 觉得难，想要图解/动画/演绎（'画给我看''演绎一下'）\n"
+        "- mentor: 想系统学某个领域/主题（'我要系统学''怎么入门'）\n"
+        "- create: 想把学过的东西写成文章/输出内容\n"
+        "- chat: 闲聊或以上都不是\n"
+        "只输出 JSON。" + ("注意：文本里有链接，若语气是先存着则 save，想学习则 learn。" if has_url else "")
+    )
+    try:
+        result = _extract_json(_chat(system, text, max_tokens=400))
+        if result.get("intent") not in INTENTS:
+            result["intent"] = "explain"
+        return result
+    except Exception:
+        return {"intent": "save" if has_url else "explain", "signals": [], "concepts": []}
+
+
+def weave_explain(concepts: list[str], profile_text: str, concept_bodies: dict) -> dict:
+    """编织：讲清多个概念之间的关系。返回 {"relationship": ..., "links": [[a,b],...]}"""
+    bodies = "\n\n".join(f"【{k}】\n{v[:400]}" for k, v in concept_bodies.items())
+    schema = '{"relationship": "用大白话讲清这几个概念的关系，150字内，可用用户熟悉领域类比", "links": [["概念A","概念B"]]}'
+    system = (
+        "你是「织识」的知识编织者。讲清用户提到的概念之间的关系（从属/对比/因果/易混），"
+        "并给出应该建立的双链 pairs。严格输出 JSON。\n"
+        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
+    )
+    user = f"【概念库相关内容】\n{bodies}\n\n【提到的概念】{concepts}"
+    return _extract_json(_chat(system, user, max_tokens=800))
+
+
+def mentor_path(topic: str, profile_text: str, graph_brief: str) -> dict:
+    """导师模式：出学习路径。返回 {"goal":..., "steps":[{"concept","why","connect"}]}"""
+    schema = '{"goal": "学习目标一句话", "steps": [{"concept": "概念名", "why": "为什么先学它，50字内", "connect": "和用户已会的东西怎么串联，50字内"}]}'
+    system = (
+        "你是「织识」的导师。用户想系统学一个主题，你要出一条 4-6 步的学习路径："
+        "先学什么后学什么，每步说明理由，并尽量和用户已经掌握的概念/熟悉领域串联。"
+        "严格输出 JSON。\n"
+        f"【用户画像】\n{profile_text}\n【用户已学概念及掌握度】\n{graph_brief}\n输出 JSON schema：\n{schema}"
+    )
+    return _extract_json(_chat(system, f"我想系统学：{topic}", max_tokens=1200))
+
+
+def create_article(instruction: str, profile_text: str, concepts_brief: str, history_brief: str) -> dict:
+    """输出倒逼输出：从知识库生成自媒体原稿。"""
+    schema = '{"title": "文章标题", "article": "Markdown 原稿，800-1500字，第一人称，口语化但有干货"}'
+    system = (
+        "你是「织识」的输出引擎。用户要把学过的东西写成自媒体文章（费曼学习法：输出倒逼输入）。\n"
+        "素材来自他自己的概念库和学习留痕，文章要用第一人称讲'我是怎么学明白的'，"
+        "包含他踩过的坑、悟到的最佳实践，用他的熟悉领域举例。\n"
+        "严格输出 JSON。\n"
+        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
+    )
+    user = (f"【写作要求】{instruction}\n\n【我的概念库】\n{concepts_brief}\n\n"
+            f"【我的学习留痕（坑与心得）】\n{history_brief}")
+    return _extract_json(_chat(system, user, max_tokens=3000))
+
+
+def visualize_concept(concept: str, concept_body: str, profile_text: str) -> dict:
+    """演绎：生成自包含 HTML 图解/小动画。"""
+    schema = '{"title": "标题", "html": "完整自包含 HTML（内联CSS/JS，无外部依赖，深色背景#0f1420，中文）"}'
+    system = (
+        "你是「织识」的演绎引擎。把一个难概念做成自包含 HTML 图解或交互动画"
+        "（SVG 示意图/步骤动画/可拖动的小交互均可），帮用户直觉理解。"
+        "要求：单个完整 HTML 文档、无外部依赖、深色主题、中文标注、能在 iframe 里直接跑。"
+        "严格输出 JSON，html 字段是完整 HTML 字符串。\n"
+        f"【用户画像】\n{profile_text}\n输出 JSON schema：\n{schema}"
+    )
+    user = f"【概念】{concept}\n【已有讲解】\n{concept_body[:1000]}"
+    return _extract_json(_chat(system, user, max_tokens=6000))

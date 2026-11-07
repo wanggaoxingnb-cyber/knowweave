@@ -174,3 +174,101 @@ def graph_data() -> dict:
                 seen.add(key)
                 edges.append({"from": name, "to": link})
     return {"nodes": nodes, "edges": edges}
+
+
+# ---------- v2 新增：待学习缓存区 / 编织建边 / 弹药库 / 信号沉淀 ----------
+
+INBOX_DIR = MEMORY_DIR / "inbox"
+
+
+def add_to_inbox(title: str, url: str, hook: str) -> str:
+    INBOX_DIR.mkdir(parents=True, exist_ok=True)
+    today = date.today().isoformat()
+    safe = re.sub(r'[\\/:*?"<>|]', "_", title).strip()[:40] or "未命名"
+    path = INBOX_DIR / f"{safe}.md"
+    path.write_text(
+        f"---\n标题: {title}\n链接: {url}\n种草点: {hook}\n存入时间: {today}\n状态: 待学习\n---\n",
+        encoding="utf-8")
+    return safe
+
+
+def list_inbox() -> list[dict]:
+    result = []
+    if not INBOX_DIR.exists():
+        return result
+    for path in sorted(INBOX_DIR.glob("*.md")):
+        meta, _ = _parse_frontmatter(path.read_text(encoding="utf-8"))
+        meta["_file"] = path.stem
+        result.append(meta)
+    return result
+
+
+def remove_from_inbox(file_stem: str) -> None:
+    path = INBOX_DIR / f"{file_stem}.md"
+    if path.exists():
+        path.unlink()
+
+
+def add_link(a: str, b: str) -> bool:
+    """编织：两个概念互加双链（概念不存在则跳过该侧）。"""
+    changed = False
+    for name, other in ((a, b), (b, a)):
+        concept = load_concept(name)
+        if not concept:
+            continue
+        meta, body = concept["meta"], concept["body"]
+        existing = LINK_RE.findall(meta.get("相关概念", ""))
+        if other not in existing and other != name:
+            existing.append(other)
+            meta["相关概念"] = " ".join(f"[[{r}]]" for r in existing)
+            meta["更新时间"] = date.today().isoformat()
+            _concept_path(name).write_text(
+                _render_frontmatter(meta) + "\n" + body + "\n", encoding="utf-8")
+            changed = True
+    return changed
+
+
+def mastered_concepts(min_stage: str = "能讲给别人") -> list[str]:
+    """弹药库：掌握度达标的概念，可用来给新领域举例。"""
+    idx_min = MASTERY_STAGES.index(min_stage)
+    return [c["名称"] for c in list_concepts()
+            if MASTERY_STAGES.index(c["掌握度"]) >= idx_min]
+
+
+def append_profile_signals(signals: list[str]) -> list[str]:
+    """信号沉淀：追加到 user.md 的『信号沉淀』区。返回实际写入的条目。"""
+    if not signals:
+        return []
+    path = PROFILES_DIR / "user.md"
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    if "## 信号沉淀" not in text:
+        text += "\n\n## 信号沉淀（AI 从对话中提取，可改可删）\n"
+    written = []
+    for sig in signals[:2]:
+        sig = sig.strip().strip("。-")
+        if sig and sig not in text and len(sig) > 4:
+            text += f"\n- [{date.today().isoformat()}] {sig}"
+            written.append(sig)
+    if written:
+        path.write_text(text + "\n", encoding="utf-8")
+    return written
+
+
+def read_history_brief(limit: int = 20) -> str:
+    """读取最近问答留痕（输出模块找'坑和最佳实践'用）。"""
+    if not HISTORY_DIR.exists():
+        return ""
+    files = sorted(HISTORY_DIR.glob("qa-*.md"))[-3:]
+    text = "\n".join(f.read_text(encoding="utf-8") for f in files)
+    return text[-4000:]
+
+
+def match_concepts_in_text(text: str) -> list[str]:
+    """本地兜底：文本中命中概念库的概念名（含前缀匹配，如 RAG 命中 RAG（检索增强生成））。"""
+    hits = []
+    for c in list_concepts():
+        name = c["名称"]
+        short = re.split(r"[（(]", name)[0]
+        if name in text or (len(short) >= 2 and short in text):
+            hits.append(name)
+    return hits

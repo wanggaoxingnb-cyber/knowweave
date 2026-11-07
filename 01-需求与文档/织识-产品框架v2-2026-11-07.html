@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>织识 KnowWeave — 产品框架 v2（场景·痛点·交互·模块）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#0f1420; color:#e8eaf0; padding:32px; line-height:1.75; max-width:1200px; margin:0 auto; }
+  h1 { color:#7ec8ff; font-size:24px; margin-bottom:4px; }
+  h2 { color:#7ec8ff; font-size:18px; margin:40px 0 14px; border-left:4px solid #3b82f6; padding-left:10px; }
+  h3 { color:#f5b942; font-size:15px; margin:20px 0 8px; }
+  .sub { color:#8a93a8; font-size:13px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; margin-top:8px; }
+  th, td { border:1px solid #2c3650; padding:9px 12px; vertical-align:top; text-align:left; }
+  th { background:#1a2235; color:#7ec8ff; white-space:nowrap; }
+  td.rowhead { background:#1a2235; color:#f5b942; font-weight:600; white-space:nowrap; }
+  .box { background:#171e2e; border:1px solid #2c3650; border-radius:10px; padding:14px 18px; margin:10px 0; font-size:14px; }
+  .box b { color:#7ec8ff; }
+  .say { color:#8a93a8; font-style:italic; font-size:13px; }
+  .tag { display:inline-block; background:#1d3a2a; color:#7ee2a8; border-radius:5px; padding:1px 8px; font-size:12px; margin:2px; }
+  .tag-blue { background:#1a2a4a; color:#7ec8ff; }
+  .tag-red { background:#3a1d1d; color:#ff9090; }
+  .tag-yellow { background:#3a2f1a; color:#f5b942; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .emo { font-size:15px; }
+  .arrow { color:#3b82f6; font-weight:600; }
+  ul { padding-left:20px; }
+  li { margin:4px 0; font-size:13.5px; }
+</style>
+</head>
+<body>
+
+<h1>织识 KnowWeave · 产品框架 v2.1</h1>
+<div class="sub">2026-11-07 晚 · 整合四轮讨论（三栏交互 / 越用越懂你 / 缓存区·导师模式 / 输出倒逼输出·阶段感知路由）· 供王宁核对，确认后即开发基线</div>
+
+<h2>一、用户画像</h2>
+<div class="box"><b>王宁（第一用户即评委画像）</b>：28 岁产品经理，直销行业，0 技术背景。正在系统补 AI 知识（目标：AI 产品经理方向）。时间高度碎片化：通勤刷手机、晚上有 1-2 小时整块时间。熟悉英雄联盟、三角洲、门店运营。<br>
+<b>放大人群</b>：想用 AI 时代知识给自己续命的职场人 / 想转行 AI 的产品经理 / 备考与自学者。</div>
+
+<h2>二、场景清单（按一天的时间线拆细）</h2>
+<table>
+<tr><th style="width:90px">场景</th><th>触发</th><th>用户说什么/做什么</th><th>织识做什么</th><th>情绪点</th></tr>
+<tr><td class="rowhead">S1 通勤种草</td><td>刷到好文章，地铁上没法细读</td><td>丢链接 + "先存着"</td><td>抓正文 → 存待学习区 + 一句话种草点<br><span class="tag-yellow">新：缓存区</span></td><td class="emo">😌 没丢，安心</td></tr>
+<tr><td class="rowhead">S2 碎片消化</td><td>排队/午休有 5 分钟</td><td>打开待学习区，点「听个大概」</td><td>只生成 60 秒播客摘要，先听个大概<br><span class="tag-yellow">新：轻消化</span></td><td class="emo">🎧 耳朵先学</td></tr>
+<tr><td class="rowhead">S3 晚上深学</td><td>整块时间，正式学今天存的东西</td><td>待学习区点「开始学」</td><td>完整学习页：导读+概念卡+检验题+播客，掌握度落库</td><td class="emo">😃 真学会了</td></tr>
+<tr><td class="rowhead">S4 主动攻坚</td><td>"我想系统学 LLM 原理"</td><td>直接说出学习目标</td><td>切导师模式：出学习路径（先学啥后学啥+每步串联你已会的）<br><span class="tag-yellow">新：导师模式</span></td><td class="emo">🧭 有方向了</td></tr>
+<tr><td class="rowhead">S5 卡住求助</td><td>Transformer 看三遍没懂</td><td>"太难了，画给我看 / 用游戏演绎"</td><td>生成自包含 HTML 图解/交互动画<br><span class="tag-yellow">新：演绎</span></td><td class="emo">🤯→💡</td></tr>
+<tr><td class="rowhead">S6 编织对账</td><td>隐约觉得两个概念有关系</td><td>"RAG 跟幻觉什么关系？"</td><td>讲清关系 + 建立双链 + 图谱长边高亮</td><td class="emo">🤩 连起来了</td></tr>
+<tr><td class="rowhead">S7 周末回顾</td><td>想看看这周学得怎样</td><td>看图谱 / 问"我这周学了啥"</td><td>图谱按掌握度着色；标出"快忘了"的节点，一键重新考我</td><td class="emo">😎 有掌控感</td></tr>
+</table>
+
+<h2>三、痛点（终版措辞，可直接进商业计划书）</h2>
+<div class="grid2">
+<div class="box"><b>P1 收藏家谬误</b><br>收藏=读过，稍后读=永远不读。Pocket 死了，微信收藏夹活着但没人打开。<span class="sub">（2025-07 Pocket 关停）</span></div>
+<div class="box"><b>P2 通用 AI 不懂我</b><br>ChatGPT 每次从零开始：不知道我是产品经理、不记得我上周学过什么、举例全是程序员视角。</div>
+<div class="box"><b>P3 知识是孤岛</b><br>文章各看各的，"回归测试"和"自回归"越学越混，没人帮我串联对账。</div>
+<div class="box"><b>P4 看过≠学会</b><br>没有检验环节，自以为懂了，一被问就露馅。</div>
+<div class="box"><b>P5 硬概念劝退</b><br>Transformer、Attention 纯文字越看越晕，缺一个"用我懂的方式演绎"。</div>
+<div class="box"><b>P6 没有路径感</b><br>想系统学一个领域时，不知道先学什么后学什么，缺一个导师。<span class="sub">（Khanmigo 验证了 AI 导师需求，但它 20+ 按钮的仪表盘被吐槽繁琐）</span></div>
+</div>
+
+<h2>四、交互总逻辑（一个框进，三栏出，四层架构）</h2>
+<div class="box">
+<b>输入层</b>：统一输入框 —— <span class="tag">打字/语音输入法</span><span class="tag">贴链接</span><span class="tag">拖 md·txt·pdf</span><span class="tag">拖截图</span><span class="tag">拖文件夹</span><br>
+<span class="arrow">▼</span><br>
+<b>大脑层（LLM 意图路由，用户永远不选按钮）</b>：七类意图
+</div>
+<table>
+<tr><th style="width:80px">意图</th><th>用户的话</th><th>处理管线</th><th>产出形态</th><th>记忆写入</th></tr>
+<tr><td class="rowhead">① 讲解</td><td class="say">"回归测试是啥"</td><td>检索旧概念+画像 → 生成</td><td>图文卡+串联+防混+播客</td><td>新概念建档/旧概念升级</td></tr>
+<tr><td class="rowhead">② 学习</td><td class="say">丢文章/链接/"帮我学这篇"</td><td>抓正文 → 学习页管线</td><td>学习页五件套</td><td>1-3 概念建档，来源=资料</td></tr>
+<tr><td class="rowhead">③ 收藏</td><td class="say">"先存着""回头再看"</td><td>抓正文 → 只抽一句话种草点</td><td>待学习区条目</td><td>inbox 建档（不进概念库）</td></tr>
+<tr><td class="rowhead">④ 编织</td><td class="say">"A 和 B 什么关系"</td><td>识别概念 → 讲关系 → 建双链</td><td>关系讲解+图谱新边高亮</td><td>两概念互加 [[双链]]</td></tr>
+<tr><td class="rowhead">⑤ 检验</td><td class="say">"考考我"</td><td>出题 → 判题 → 讲评</td><td>3 题+反馈</td><td>掌握度升/降，留痕</td></tr>
+<tr><td class="rowhead">⑥ 演绎</td><td class="say">"太难了，画给我看"</td><td>生成自包含 HTML</td><td>图解/交互动画（iframe）</td><td>概念卡追加演绎记录</td></tr>
+<tr><td class="rowhead">⑦ 导师</td><td class="say">"我要系统学 XX"</td><td>读图谱+画像 → 出学习路径</td><td>路径图（中栏）+逐步引导</td><td>学习目标入画像</td></tr>
+<tr><td class="rowhead">⑧ 输出</td><td class="say">"把最近学的写成文章"</td><td>读概念库+问答留痕（坑/最佳实践）→ 成文</td><td>自媒体原稿（中栏）+可导出/可生成给创作Agent的交接提示词</td><td>输出记录留痕</td></tr>
+</table>
+<div class="box">
+<span class="arrow">▼</span><br>
+<b>呈现层（三栏）</b>：左=对话区（自然语言短回复+答题）｜中=产出区（卡片/学习页/动画/路径/播客）｜右=图谱区（点节点跳详情）<br>
+<span class="arrow">▼</span><br>
+<b>记忆层（全 Markdown，透明可翻）</b>：concepts/ 概念卡 · profiles/ 用户画像 · inbox/ 待学习 · data/history/ 留痕
+</div>
+
+<h2>五、两个新模块的细节设计</h2>
+
+<h3>5.1 待学习缓存区（解 P1 收藏家谬误）</h3>
+<ul>
+<li><b>关键洞察</b>：稍后读工具全死在"只存不消化"。织识的缓存区自带消化机制——这是和 Pocket/微信收藏的本质差异。</li>
+<li><b>存</b>：丢链接说"先存着"→ 抓正文、抽一句话种草点（为什么值得读）、存 inbox/。秒级完成，不打断通勤。</li>
+<li><b>消化两条路</b>：每条目两个按钮——「开始学」（走完整学习页，S3）｜「听个大概」（只出 60 秒播客，S2）。</li>
+<li><b>防吃灰</b>：周末回顾（S7）时提示"你有 3 篇存了超过 5 天没学"；学过的条目自动归档。</li>
+<li><b>存储</b>：memory/inbox/&lt;标题&gt;.md（frontmatter：标题/链接/种草点/存入时间/状态），全透明。</li>
+</ul>
+
+<h3>5.2 导师模式 vs 举例模式（解 P6 路径感）</h3>
+<div class="grid2">
+<div class="box"><b>举例模式（默认，被动）</b><br>学陌生概念时，用你高熟悉度领域（英雄联盟）举例。适合"遇到啥学啥"。</div>
+<div class="box"><b>导师模式（主动，你说"我要系统学XX"触发）</b><br>它读你的图谱和画像，出学习路径：先学哪 3 个概念、为什么、每步串联你已经会的什么。路径挂在中栏，学一个勾一个。</div>
+</div>
+<div class="box"><b>最终方案：阶段感知路由（模式不靠用户选）</b><br>
+模式是 Agent 根据你的学习阶段自动路由的状态，不是开关：<br>
+· 概念全是 initial（新领域）→ 默认概念讲解模式<br>
+· 平均掌握度到「理解了」（半桶水）→ 对话里无痛推荐："你最近问了 3 个 RAG 相关的，要不要考考你？"一键接受/拒绝，拒绝就继续讲<br>
+· 主动说"我要系统学 XX" → 进导师模式，出现「🧭 攻坚：XX」标签，可点退出<br>
+<b>原则：不上来给选择，在场景里给推荐，推荐必带理由，用户可一句话否决。</b></div>
+
+<h3>5.3 输出倒逼输出（费曼模块，解"学完没产出"）</h3>
+<ul>
+<li><b>理念</b>：费曼学习法——能讲给别人/写出来，才算真学会。输出是检验，也是资产。</li>
+<li><b>说什么</b>："把最近学的写成一篇文章" / "给我三个大纲" / "围绕 RAG 写篇公众号原稿"</li>
+<li><b>它做什么</b>：去知识图谱检索相关概念 + 翻问答留痕（你当时踩的坑、悟到的最佳实践）→ 生成第一人称视角的自媒体原稿（"我怎么把 RAG 学明白的"），中栏渲染，可复制/下载 Markdown</li>
+<li><b>接 Agent</b>：可生成一段「给内容创作 Agent 的交接提示词」——包含大纲、素材清单（你的概念卡+你的坑+你的金句），粘给任何创作 Agent 接着干</li>
+<li><b>专业人设价值</b>：持续输出"新技术×我的业务"的串联文章，就是这一行的专业性证明</li>
+</ul>
+
+<h2>六、越用越懂你（信号沉淀机制，已确认规则）</h2>
+<ul>
+<li><b>提取什么</b>：身份/熟悉领域+熟悉度/学习目标/认知风格/卡点/显式"记住这个"</li>
+<li><b>何时提取</b>：随每次回答顺带输出 signals 字段，零额外调用，实时</li>
+<li><b>边界</b>：只记用户明确说出口的，不推测不贴标签；弱信号进"待确认区"先问再用；每轮最多沉淀 1-2 条；语音输入的啰嗦错字自动降噪</li>
+<li><b>反哺</b>：高熟悉度领域优先举例；复习时故意换领域出题验证真懂；用了新偏好时标注"（用了你说过的 ADC）"</li>
+<li><b>弹药库飞轮（核心机制）</b>：掌握度≥「能讲给别人」的概念自动加入举例弹药库——你学懂的领域，会变成给下一个陌生领域举例的材料。英雄联盟 → 测试概念 → AI 概念，层层叠加，越学越快。</li>
+<li><b>透明</b>：「它眼中的你」面板，每条画像可看可改可删</li>
+</ul>
+
+<h2>七、功能模块全景 & 开发状态</h2>
+<table>
+<tr><th>模块</th><th>状态</th><th>备注</th></tr>
+<tr><td>统一输入框（文字/文件/截图）</td><td><span class="tag">✅ 已跑通</span></td><td>链接抓取+文件夹待做</td></tr>
+<tr><td>讲解/学习/检验 三管线</td><td><span class="tag">✅ 已跑通</span></td><td>含播客、概念卡、判题联动掌握度</td></tr>
+<tr><td>三栏布局重做</td><td><span class="tag-yellow">今晚</span></td><td>对话/产出/图谱</td></tr>
+<tr><td>意图路由（LLM 七意图）</td><td><span class="tag-yellow">今晚</span></td><td></td></tr>
+<tr><td>待学习缓存区</td><td><span class="tag-yellow">明天</span></td><td>inbox/ + 两个消化按钮</td></tr>
+<tr><td>编织意图（建边）</td><td><span class="tag-yellow">明天</span></td><td></td></tr>
+<tr><td>演绎（HTML 图解/动画）</td><td><span class="tag-yellow">明天</span></td><td>iframe 渲染</td></tr>
+<tr><td>导师模式（学习路径）</td><td><span class="tag-yellow">明天</span></td><td>简版：出路径+挂中栏</td></tr>
+<tr><td>信号沉淀+「它眼中的你」面板</td><td><span class="tag-yellow">明天</span></td><td>画像 schema 扩展已确认</td></tr>
+<tr><td>输出模块（费曼成文+交接提示词）</td><td><span class="tag-yellow">今晚简版</span></td><td>读概念库+留痕 → 原稿</td></tr>
+<tr><td>阶段感知推荐（"要不要考考你"）</td><td><span class="tag-yellow">明天</span></td><td>按掌握度分布触发</td></tr>
+<tr><td>真游戏化 / 真语音 / 视频生成</td><td><span class="tag-red">停车场</span></td><td>视频里当 roadmap 讲</td></tr>
+</table>
+
+<h2>八、三天冲刺排期（功能冻结线：11-08 晚）</h2>
+<table>
+<tr><th>时间</th><th>交付</th></tr>
+<tr><td>11-07 晚</td><td>三栏布局 + 统一输入 + 意图路由（讲解/学习/收藏/编织/检验）→ 王宁可上手玩</td></tr>
+<tr><td>11-08</td><td>演绎 + 导师模式 + 待学习区 + 信号沉淀面板 + 打磨话术 → <b>功能冻结</b></td></tr>
+<tr><td>11-09</td><td>商业计划书（本文档即素材库）+ 3 分钟视频（脚本按 S1→S7 场景线拍）</td></tr>
+<tr><td>11-10</td><td>三件套提交，留缓冲</td></tr>
+</table>
+
+</body>
+</html>

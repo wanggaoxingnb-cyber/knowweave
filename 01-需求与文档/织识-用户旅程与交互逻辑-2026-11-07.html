@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>织识 KnowWeave — 用户旅程图 & 交互逻辑</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,"PingFang SC",sans-serif; background:#0f1420; color:#e8eaf0; padding:32px; line-height:1.7; }
+  h1 { color:#7ec8ff; font-size:24px; margin-bottom:4px; }
+  h2 { color:#7ec8ff; font-size:18px; margin:36px 0 16px; border-left:4px solid #3b82f6; padding-left:10px; }
+  .sub { color:#8a93a8; font-size:13px; margin-bottom:8px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { border:1px solid #2c3650; padding:10px 12px; vertical-align:top; text-align:left; }
+  th { background:#1a2235; color:#7ec8ff; white-space:nowrap; }
+  td.rowhead { background:#1a2235; color:#f5b942; font-weight:600; white-space:nowrap; width:110px; }
+  .emo-up { color:#7ee2a8; } .emo-mid { color:#f5b942; } .emo-down { color:#ff9090; }
+  .tag { display:inline-block; background:#1d3a2a; color:#7ee2a8; border-radius:5px; padding:1px 7px; font-size:12px; margin:1px; }
+  .tag-blue { background:#1a2a4a; color:#7ec8ff; }
+
+  /* 交互逻辑图 */
+  .flow { display:flex; flex-direction:column; align-items:center; gap:0; }
+  .fbox { background:#171e2e; border:1px solid #3b82f6; border-radius:10px; padding:12px 20px; text-align:center; max-width:860px; }
+  .fbox b { color:#7ec8ff; }
+  .farrow { color:#3b82f6; font-size:22px; line-height:1.2; padding:4px 0; }
+  .intents { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:100%; max-width:960px; margin-top:8px; }
+  .intent { background:#171e2e; border:1px solid #2c3650; border-radius:10px; padding:12px 14px; font-size:13px; }
+  .intent b { color:#f5b942; font-size:14px; }
+  .intent .out { color:#7ee2a8; font-size:12px; margin-top:6px; }
+  .intent .mem { color:#8a93a8; font-size:12px; margin-top:4px; }
+  .say { color:#8a93a8; font-size:12px; font-style:italic; }
+  .panes { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; max-width:960px; width:100%; margin-top:8px; }
+  .panebox { background:#101828; border:1px solid #2c3650; border-radius:10px; padding:12px 14px; font-size:13px; text-align:center; }
+  .panebox b { color:#7ec8ff; }
+  .note { color:#8a93a8; font-size:12px; margin-top:6px; }
+  .membox { background:#131a29; border:1px dashed #f5b942; border-radius:10px; padding:10px 18px; font-size:13px; max-width:860px; text-align:center; }
+  .membox b { color:#f5b942; }
+</style>
+</head>
+<body>
+
+<h1>织识 KnowWeave — 用户旅程图 & 交互逻辑</h1>
+<div class="sub">2026-11-07 · 供王宁核对 · 人物画像：王宁，产品经理，0 技术背景，在补 AI 与测试知识；时间碎片（通勤/晚上），熟悉英雄联盟/直销/门店</div>
+
+<h2>一、用户旅程图（一次完整学习闭环）</h2>
+<table>
+<tr><th style="width:110px"></th><th>① 遇到资料</th><th>② 入库学习</th><th>③ 理解串联</th><th>④ 检验掌握</th><th>⑤ 编织成网</th><th>⑥ 回顾复习</th></tr>
+<tr>
+  <td class="rowhead">用户行为</td>
+  <td>通勤刷到一篇 RAG 公众号文章，觉得有用</td>
+  <td>把链接直接贴进输入框（或拖 PDF/截图）</td>
+  <td>看学习页：导读分段读，概念卡逐个过</td>
+  <td>答学习页底部的检验题；或主动说"考考我"</td>
+  <td>问"RAG 跟我学过的幻觉是什么关系"</td>
+  <td>周末打开图谱，看哪片密、哪片荒</td>
+</tr>
+<tr>
+  <td class="rowhead">触点</td>
+  <td>微信/浏览器 → 织识输入框</td>
+  <td>左栏对话区（统一入口）</td>
+  <td>中栏产出区 + 播客音频</td>
+  <td>概念卡上的「考考我」+ 对话区答题</td>
+  <td>对话区 + 右栏图谱</td>
+  <td>右栏图谱（点节点看详情）</td>
+</tr>
+<tr>
+  <td class="rowhead">情绪曲线</td>
+  <td><span class="emo-mid">😐 又一篇，先码住</span></td>
+  <td><span class="emo-up">🙂 丢进去就行，不用选按钮</span></td>
+  <td><span class="emo-up">😃 它用英雄联盟讲，我真懂了</span></td>
+  <td><span class="emo-down">😅 答错一题</span> → <span class="emo-up">😌 换例子重讲后懂了</span></td>
+  <td><span class="emo-up">🤩 图谱上两个点连起来了！</span></td>
+  <td><span class="emo-up">😎 原来我这周学了这么多</span></td>
+</tr>
+<tr>
+  <td class="rowhead">没有织识时<br>的痛点</td>
+  <td>收藏夹吃灰，"码了=学了"</td>
+  <td>要自己读全文、做笔记，坚持不下来</td>
+  <td>ChatGPT 举例不对背景，也不记得我学过啥</td>
+  <td>看过≠学会，没有被检验的机会</td>
+  <td>概念之间关系全靠自己脑补，越学越混</td>
+  <td>学了哪些、忘了哪些，完全没数</td>
+</tr>
+<tr>
+  <td class="rowhead">织识的动作</td>
+  <td>统一输入框，贴链接即抓取正文</td>
+  <td>LLM 生成学习页：总结+导读+概念卡+检验题+播客</td>
+  <td>读用户画像，用熟悉领域举例；自动带"你学过XX"防混提示</td>
+  <td>出题→判题→掌握度真实升降；答错换个例子重讲</td>
+  <td>识别概念、建立双链、图谱实时长边</td>
+  <td>图谱按掌握度着色；问答留痕可回看成长轨迹</td>
+</tr>
+<tr>
+  <td class="rowhead">验收信号<br>（demo 可演示）</td>
+  <td>贴公众号链接，10 秒内出学习页</td>
+  <td>学习页五件套齐全（总结/导读/卡/题/播客）</td>
+  <td>问"自回归"→ 提示"别和回归测试混"</td>
+  <td>答错后图谱上该节点掌握度降级变色</td>
+  <td>图谱当场新增一条边并高亮</td>
+  <td>图谱节点颜色反映掌握度梯度</td>
+</tr>
+</table>
+
+<h2>二、交互逻辑图（一个框进，三栏出）</h2>
+<div class="flow">
+  <div class="fbox"><b>统一输入框（左栏对话区）</b><br>
+    <span class="tag">打字提问</span><span class="tag">贴链接</span><span class="tag">拖 md/txt/pdf</span><span class="tag">拖截图</span><span class="tag">拖文件夹</span>
+    <div class="note">没有"提问按钮/入库按钮"之分，用户永远不用选</div>
+  </div>
+  <div class="farrow">▼</div>
+  <div class="fbox"><b>LLM 意图路由</b>（一次调用，模型自己判断）<br>
+    <span class="note">规则辅助：带文件/链接 → 必走「学习」；纯文字 → 模型判断意图</span>
+  </div>
+  <div class="farrow">▼</div>
+  <div class="intents">
+    <div class="intent"><b>① 讲解</b><br><span class="say">"回归测试是啥"</span><br>→ 图文卡 + 你学过XX串联 + 防混提示 + 播客<div class="mem">写记忆：新概念建档 / 旧概念掌握度+1</div></div>
+    <div class="intent"><b>② 学习</b><br><span class="say">贴文章/链接/文件</span><br>→ 学习页：总结+导读+概念卡+检验题+播客<div class="mem">写记忆：1-3 个概念建档，来源=该资料</div></div>
+    <div class="intent"><b>③ 编织</b><br><span class="say">"RAG 和幻觉什么关系"</span><br>→ 讲清关系 + 建立双链 + 图谱长边高亮<div class="mem">写记忆：两个概念互加 [[双链]]</div></div>
+    <div class="intent"><b>④ 检验</b><br><span class="say">"考考我"</span><br>→ 出 3 题（定义→辨析→应用）→ 判题 → 答错换例子重讲<div class="mem">写记忆：掌握度升/降一级</div></div>
+    <div class="intent"><b>⑤ 演绎</b><br><span class="say">"Transformer 太难了，画给我看"</span><br>→ 生成自包含 HTML 图解/交互动画，中栏直接渲染<div class="mem">写记忆：概念卡追加"演绎"区块</div></div>
+    <div class="intent"><b>⑥ 闲聊</b><br><span class="say">"你好"、"今天学什么好"</span><br>→ 正常对话（带画像与记忆上下文）<div class="mem">读记忆：画像+概念列表；不写</div></div>
+  </div>
+  <div class="farrow">▼</div>
+  <div class="panes">
+    <div class="panebox"><b>左栏 · 对话区</b><br>自然语言短回复 + 答题交互<br><span class="note">详细内容永远指向中间</span></div>
+    <div class="panebox"><b>中栏 · 产出区</b><br>概念卡 / 学习页 / 演绎动画 / 播客<br><span class="note">当前任务的最优形态，可验收</span></div>
+    <div class="panebox"><b>右栏 · 图谱区</b><br>实时更新 + 高亮涉及节点<br><span class="note">点节点 → 中栏显示概念详情</span></div>
+  </div>
+  <div class="farrow">▼</div>
+  <div class="membox"><b>记忆层（Markdown 文件夹）</b>：concepts/ 概念卡 · profiles/ 用户画像 · data/history/ 问答留痕<br>
+  <span class="note">每条链路都遵循自生长四规则：新概念建档 / 旧概念升级 / 问答留痕 / 画像信号入库</span></div>
+</div>
+
+<h2>三、三个关键设计决策（已拍板，供回溯）</h2>
+<table>
+<tr><th>决策</th><th>结论</th><th>理由</th></tr>
+<tr><td class="rowhead">意图判断</td><td>LLM 判断，不用规则</td><td>"懂我"的感觉来自自然语言理解，多花约 1 秒值得</td></tr>
+<tr><td class="rowhead">演绎形态</td><td>LLM 生成自包含 HTML，iframe 渲染</td><td>一次覆盖图片/动画/小交互；比接图像/视频生成 API 稳</td></tr>
+<tr><td class="rowhead">真游戏化</td><td>进停车场</td><td>掌握度等级已是经验条雏形；视频里当 roadmap 讲</td></tr>
+</table>
+
+</body>
+</html>
