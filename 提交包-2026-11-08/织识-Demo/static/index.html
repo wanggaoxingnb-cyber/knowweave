@@ -126,7 +126,12 @@
 <main>
   <div id="chatPane">
     <div id="chatLog">
-      <div class="msg sys">把文章/链接/截图丢给我，或直接问。我会记得你学过什么。</div>
+      <div class="msg sys">把文章/链接/截图丢给我，或直接问。我会记得你学过什么。
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="mini-btn" onclick="fillAndSend('灰度测试是啥')">① 30 秒看它怎么讲</button>
+        <button class="mini-btn" onclick="openProfile()">② 它记得我什么</button>
+        <button class="mini-btn" onclick="openGraph()">③ 看看知识图谱</button>
+      </div></div>
     </div>
     <div id="inputBar">
       <div id="fileChips"></div>
@@ -477,6 +482,10 @@ async function send() {
   } catch (e) { clearTimeout(slowHint); showStatus(''); addMsg('bot', '出错了：' + e.message); }
 }
 
+fetch('/api/config').then(r=>r.json()).then(c=>{
+  if (c.cloud_demo) document.querySelector('.tagline').textContent += '｜云端演示版 · 每小时重置 · 截图 OCR 不可用';
+  if (c.mock) showStatus('演示兜底模式：未配置 LLM key，部分功能受限'), setTimeout(()=>showStatus(''), 5000);
+}).catch(()=>{});
 $('chatInput').focus();
 </script>
 </body>

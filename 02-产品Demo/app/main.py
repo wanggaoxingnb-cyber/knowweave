@@ -22,6 +22,63 @@ TTS_VOICE = os.getenv("TTS_VOICE", "zh-CN-YunxiNeural")
 
 app = FastAPI(title="织识 KnowWeave")
 
+# ---------- 云演示保护（本地默认全关，DEMO_CLOUD=1 才启用） ----------
+DEMO_CLOUD = os.getenv("DEMO_CLOUD") == "1"
+_RATE: dict = {}
+RATE_LIMIT = int(os.getenv("DEMO_RATE_LIMIT", "30"))
+
+
+@app.middleware("http")
+async def _rate_limit(request: Request, call_next):
+    if DEMO_CLOUD and request.url.path == "/api/chat" and request.method == "POST":
+        import datetime
+        ip = request.client.host if request.client else "unknown"
+        today = datetime.date.today().isoformat()
+        day, count = _RATE.get(ip, (today, 0))
+        if day != today:
+            day, count = today, 0
+        if count >= RATE_LIMIT:
+            return JSONResponse({"type": "chat", "reply": "今天的演示额度用完啦（每位访客每天 30 次）。想深度玩，欢迎按体验说明在本地跑一个属于你自己的织识。"})
+        _RATE[ip] = (day, count + 1)
+    return await call_next(request)
+
+
+@app.get("/api/config")
+def api_config():
+    return {"cloud_demo": DEMO_CLOUD, "mock": not brain.available()}
+
+
+def _reset_memory_state():
+    """云演示用：每小时把记忆库重置回种子态，防止多评委互相污染。"""
+    import shutil
+    seeds = ROOT / "data" / "seeds"
+    if not (seeds / "concepts").exists():
+        return
+    for f in memory.CONCEPTS_DIR.glob("*.md"):
+        f.unlink()
+    for f in (seeds / "concepts").glob("*.md"):
+        shutil.copy(f, memory.CONCEPTS_DIR / f.name)
+    shutil.copy(seeds / "profiles" / "user.md", memory.PROFILES_DIR / "user.md")
+    for d in (memory.MEMORY_DIR / "inbox", memory.HISTORY_DIR, AUDIO_DIR):
+        if d.exists():
+            for f in d.glob("*"):
+                if f.is_file():
+                    f.unlink()
+
+
+if os.getenv("DEMO_AUTO_RESET") == "1":
+    import threading
+    def _auto_reset_loop():
+        import time
+        while True:
+            time.sleep(3600)
+            try:
+                _reset_memory_state()
+                print("[demo] 记忆库已自动重置为种子态")
+            except Exception as e:
+                print(f"[demo] 重置失败: {e}")
+    threading.Thread(target=_auto_reset_loop, daemon=True).start()
+
 
 # ---------- 工具 ----------
 
@@ -134,7 +191,7 @@ def _mock_answer(question: str, related: list[dict]) -> dict:
             return value
     return {
         "concept": question[:10],
-        "explanation": "（mock 模式：未配置 LLM key，这是占位回答）",
+        "explanation": "当前是演示兜底模式（未配置 LLM key）。推荐试这几个能跑通的：「灰度测试是啥」「考考我 RAG」。配置任意 OpenAI 兼容 key 即可解锁完整智能。",
         "analogy": "", "hook": "", "warning": "",
         "podcast_script": "", "related": [],
     }
@@ -271,7 +328,9 @@ def audio(name: str):
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=False)
+    port = int(os.getenv("PORT", "8000"))
+    host = "0.0.0.0" if DEMO_CLOUD else "127.0.0.1"
+    uvicorn.run("app.main:app", host=host, port=port, reload=False)
 
 
 # ==================== v2：统一入口 + 意图路由 ====================
@@ -461,7 +520,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
             memory.append_history(f"[导师] {topic}", [], result.get("goal", ""))
             return {"type": "mentor", "reply": f"路径给你排好了，放右侧舞台 🧭 从第一步开始就行{signal_note}",
                     "mentor": result, "topic": topic}
-        return {"type": "chat", "reply": "mock 模式不支持导师模式"}
+        return {"type": "chat", "reply": "导师模式需要配置 LLM key。演示路径：先问「灰度测试是啥」，再点卡片上的「考考我」。"}
 
     # ---- create：输出倒逼输出 ----
     if intent == "create":
@@ -470,7 +529,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
             memory.append_history("[输出] 生成文章", [], result.get("title", ""))
             return {"type": "create", "reply": f"原稿写好了，放右侧舞台 ✍️{signal_note}",
                     "article": result}
-        return {"type": "chat", "reply": "mock 模式不支持输出模块"}
+        return {"type": "chat", "reply": "创作模式需要配置 LLM key。演示路径：先问「回归测试是啥」，看它怎么用你熟悉的领域举例。"}
 
     # ---- visualize：演绎 ----
     if intent == "visualize":
@@ -487,7 +546,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
                 memory.save_viz(target, result.get("title", target), result["html"])
             return {"type": "visualize", "reply": f"给「{target}」现做了一个图解，中间看 🎬",
                     "viz": result, "highlight": [target]}
-        return {"type": "chat", "reply": "mock 模式不支持演绎"}
+        return {"type": "chat", "reply": "演绎模式需要配置 LLM key。演示路径：问「灰度测试是啥」，再看右上角知识图谱。"}
 
     # ---- chat：闲聊 ----
     if intent == "chat":
