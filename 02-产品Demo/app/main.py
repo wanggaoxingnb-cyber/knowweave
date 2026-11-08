@@ -327,9 +327,20 @@ def audio(name: str):
 
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
+
+@app.exception_handler(Exception)
+async def _friendly_error(request: Request, exc: Exception):
+    """演示兜底：任何未捕获异常都回一句人话，绝不把堆栈/上游报错甩给访客。"""
+    print(f"[error] {request.url.path}: {type(exc).__name__}: {exc}")
+    return JSONResponse(
+        {"type": "chat",
+         "reply": "这一步 AI 服务有点忙，等 5 秒再说一句就好 🙏（或换个说法重试）"},
+        status_code=200,
+    )
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    host = "0.0.0.0" if DEMO_CLOUD else "127.0.0.1"
+    host = os.getenv("HOST") or ("0.0.0.0" if os.getenv("PORT") else "127.0.0.1")
     uvicorn.run("app.main:app", host=host, port=port, reload=False)
 
 
