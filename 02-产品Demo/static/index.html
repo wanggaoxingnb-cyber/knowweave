@@ -194,7 +194,7 @@
 <div id="status"></div>
 
 <script>
-let network = null, pendingFiles = [], stageStore = [], stageSeq = 0, currentStage = -1, profileEditing = false;
+let network = null, pendingFiles = [], stageStore = [], stageSeq = 0, currentStage = -1, profileEditing = false, lastHighlight = [];
 const $ = id => document.getElementById(id);
 const esc = t => (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 
@@ -246,7 +246,8 @@ function addMsg(role, text) {
 }
 
 /* ---------- 图谱（全屏覆盖层） ---------- */
-async function openGraph(highlight = []) {
+async function openGraph(highlight = lastHighlight) {
+  lastHighlight = [];
   $('graphOverlay').classList.add('open');
   $('graphDetail').style.display = 'none';
   const data = await (await fetch('/api/graph')).json();
@@ -472,7 +473,7 @@ async function send() {
     else if (d.type==='create') renderCreate(d);
     else if (d.type==='visualize') renderViz(d);
     else if (d.type==='save') { updateInboxCount(d.inbox); }
-    if (d.highlight && d.highlight.length) { /* 图谱高亮在下次打开图谱时体现 */ }
+    if (d.highlight && d.highlight.length) { lastHighlight = d.highlight; }
   } catch (e) { clearTimeout(slowHint); showStatus(''); addMsg('bot', '出错了：' + e.message); }
 }
 
