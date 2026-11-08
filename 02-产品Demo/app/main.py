@@ -363,7 +363,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
             pages.append(page)
             highlight += page.get("highlight", [])
         ok = len([p for p in pages if not p.get("error")])
-        return {"type": "learn", "reply": f"学完 {ok} 份资料，学习页放中间了 👉 底部有检验题，敢不敢答",
+        return {"type": "learn", "reply": f"学完 {ok} 份资料，学习页放右侧舞台了 👉 底部有检验题，敢不敢答",
                 "pages": pages, "highlight": highlight}
 
     if not text:
@@ -409,7 +409,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
         if len(raw) < 100:
             return {"type": "chat", "reply": "链接抓不到正文，把正文复制贴给我吧。"}
         page = await _learn_pipeline_v2(url_match.group(0), raw)
-        return {"type": "learn", "reply": f"学完了，学习页放中间 👉{signal_note}",
+        return {"type": "learn", "reply": f"学完了，学习页放右侧舞台 👉{signal_note}",
                 "pages": [page], "highlight": page["highlight"]}
 
     # ---- weave：编织 ----
@@ -450,7 +450,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
         concept = memory.load_concept(target)
         quiz_data = brain.make_quiz(target, concept["body"], profile) if brain.available() \
             else {"questions": [{"q": f"用自己的话讲讲{target}？", "a": "mock"}]}
-        return {"type": "quiz", "reply": f"来，考考你「{target}」💪 题放中间了，答完我判",
+        return {"type": "quiz", "reply": f"来，考考你「{target}」💪 题放右侧舞台了，答完我判",
                 "quiz": quiz_data.get("questions", []), "concept": target, "highlight": [target]}
 
     # ---- mentor：导师 ----
@@ -459,7 +459,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
         if brain.available():
             result = brain.mentor_path(topic, profile, _graph_brief())
             memory.append_history(f"[导师] {topic}", [], result.get("goal", ""))
-            return {"type": "mentor", "reply": f"路径给你排好了，放中间 🧭 从第一步开始就行{signal_note}",
+            return {"type": "mentor", "reply": f"路径给你排好了，放右侧舞台 🧭 从第一步开始就行{signal_note}",
                     "mentor": result, "topic": topic}
         return {"type": "chat", "reply": "mock 模式不支持导师模式"}
 
@@ -468,7 +468,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
         if brain.available():
             result = brain.create_article(text, profile, _concepts_brief(), memory.read_history_brief())
             memory.append_history("[输出] 生成文章", [], result.get("title", ""))
-            return {"type": "create", "reply": f"原稿写好了，放中间 ✍️{signal_note}",
+            return {"type": "create", "reply": f"原稿写好了，放右侧舞台 ✍️{signal_note}",
                     "article": result}
         return {"type": "chat", "reply": "mock 模式不支持输出模块"}
 
@@ -550,7 +550,7 @@ async def inbox_podcast(payload: dict):
             "直接出口播稿，不要任何格式和标题。",
             src, 300, thinking=False)
     audio_url = await _tts(script)
-    return {"type": "podcast", "reply": f"「{item.get('标题')}」的 60 秒版放中间了 🎧",
+    return {"type": "podcast", "reply": f"「{item.get('标题')}」的 60 秒版放右侧舞台了 🎧",
             "title": item.get("标题"), "script": script, "audio_url": audio_url}
 
 
