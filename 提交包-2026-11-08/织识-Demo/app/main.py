@@ -502,7 +502,7 @@ async def chat_v2(text: str = Form(""), files: list[UploadFile] = File(default=[
     result = _ask_pipeline(text)
     result["audio_url"] = await _tts(result["card"].get("podcast_script", ""))
     result["type"] = "explain"
-    result["reply"] = (result["card"].get("explanation", "")[:100] + "… 详细卡片在中间 👉") if result.get("card") else "嗯？"
+    result["reply"] = (result["card"].get("explanation", "")[:100] + "… 详细卡片在右侧舞台 👉") if result.get("card") else "嗯？"
     if signal_note:
         result["reply"] += signal_note
     return result
