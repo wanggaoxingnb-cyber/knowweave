@@ -171,7 +171,7 @@ async def s13(page):
     await page.wait_for_timeout(500)
 
 SCENES = [
-    dict(id='s00', narration='这是我用了一周的织识。别急，先看它到底记住了我什么。', action=s0),
+    dict(id='s00', narration='这是我用一个周末做出的织识。别急，先看它现在记住了我什么。', action=s0),
     dict(id='s01', narration='通勤路上刷到一篇好文章，没空读？丢个链接，说声先存着，它抓正文、留一句种草点，十秒进待学习区，不打断通勤。', action=s1),
     dict(id='s02', narration='午休只有五分钟？点听个大概，它只做一段六十秒的播客，耳朵先学起来。', action=s2),
     dict(id='s03', narration='晚上有了整块时间，点开始学，导读、概念卡、检验题、播客，一个学习页全给齐。', action=s3),
@@ -184,6 +184,6 @@ SCENES = [
     dict(id='s10', narration='它记得我是谁。它眼中的你里，身份、行业、熟悉领域，还有最近聊出来的信号，全透明，随时能改能删。', action=s10),
     dict(id='s11', narration='更关键的是，这份记忆不是黑盒，就是本地一堆 Markdown 文件，能看、能改、能拷走，不上传云端。', action=s11),
     dict(id='s12', narration='学懂了的东西还能变成资产：把我最近学的写成文章，素材全来自我的概念卡和当时的疑问。越学，弹药越多。', action=s12),
-    dict(id='s13', narration='用了一周最明显的变化：收藏不再吃灰，待学习区一条一条变少；图谱从几个节点长成一张网；掌握度一点一点变绿。它真的记得我学过什么，也知道我是谁。', action=s13),
+    dict(id='s13', narration='一个周末下来：收藏不再吃灰，待学习区学一条少一条；图谱从几个节点长成一张网；掌握度一点一点变绿。它真的记得我学过什么，也知道我是谁。', action=s13),
     dict(id='s14', narration='织识 KnowWeave，记得你学过什么、也知道你是谁。我是王宁，一个用 Codex 做出这个产品的产品经理。', action=None),
 ]

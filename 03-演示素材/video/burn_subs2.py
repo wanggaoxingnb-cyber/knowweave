@@ -32,7 +32,7 @@ def render(text, out):
 
 def burn_chunk(idx, cs, ce, cues):
     mine = [(a, b, t) for a, b, t in cues if a >= cs - 0.01 and a < ce - 0.01]
-    pdir = pathlib.Path('subpng')
+    pdir = pathlib.Path('subpng'); pdir.mkdir(exist_ok=True)
     cmd = [FFMPEG, '-y', '-ss', f'{cs}', '-t', f'{ce-cs}', '-i', 'nosubs.mp4', '-threads', '3']
     parts, last = [], '[0:v]'
     for j, (a, b, t) in enumerate(mine):
